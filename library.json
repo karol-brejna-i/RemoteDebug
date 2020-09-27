@@ -1,7 +1,7 @@
 {
     "name": "RemoteDebugFork997",
     "keywords": "debug, eemote, telnet, WiFi",
-    "description": "Fork of Joao Lopes'es RemoteDebug library RemoteDebug with few minor issues resolved.\nOriginal description:\nA library for Arduino to debug projects over WiFi, with web app or telnet client, with Print commands like Serial Monitor.",
+    "description": "Fork of Joao Lopes'es RemoteDebug library with few minor issues resolved.\nOriginal description:\nA library for Arduino to debug projects over WiFi, with web app or telnet client, with Print commands like Serial Monitor.",
     "repository": {
         "type": "git",
         "url": "https://github.com/karol-brejna-i/RemoteDebug.git"

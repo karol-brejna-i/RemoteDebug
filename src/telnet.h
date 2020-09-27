@@ -1,6 +1,6 @@
-/* 
- * telnet.h - Telnet Defines 
- * 
+/*
+ * telnet.h - Telnet Defines
+ *
  * Note: only used is uncommented
  * */
 
