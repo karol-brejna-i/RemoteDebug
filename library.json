@@ -1,14 +1,38 @@
 {
-  "name": "RemoteDebug",
-  "keywords": "Debug, Remote, Telnet, WiFi",
-  "description": "A library for Arduino to debug projects over WiFi, with web app or telnet client, with Print commands like Serial Monitor.",
-  "repository":
-  {
-    "type": "git",
-    "url": "https://github.com/JoaoLopesF/RemoteDebug.git"
-  },
-  "version": "3.0.5",
-  "frameworks": "arduino",
-  "platforms": "*"
-}
+    "name": "RemoteDebugFork997",
+    "keywords": "debug, eemote, telnet, WiFi",
+    "description": "Fork of Joao Lopes'es RemoteDebug library RemoteDebug with few minor issues resolved.\nOriginal description:\nA library for Arduino to debug projects over WiFi, with web app or telnet client, with Print commands like Serial Monitor.",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/karol-brejna-i/RemoteDebug.git"
+    },
+    "license": "MIT",
+    "frameworks": "arduino",
+    "platforms": "*",
+    "authors": [
+        {
+            "name": "Joao Lopes"
+        },
+        {
+            "name": "Karol Brejna",
+            "maintainer": true
 
+        }
+    ],
+    "examples":  [
+        {
+            "name": "Basic",
+            "base": "examples/RemoteDebug_Basic",
+            "files": ["RemoteDebug_Basic.ino"]
+        },        {
+            "name": "Debugger",
+            "base": "examples/RemoteDebug_Debugger",
+            "files": ["RemoteDebug_Debugger.ino"]
+        },        {
+            "name": "Advanced",
+            "base": "examples/RemoteDebug_Advanced",
+            "files": ["RemoteDebug_Advanced.ino"]
+        }
+    ],
+    "version": "3.0.6"
+}
