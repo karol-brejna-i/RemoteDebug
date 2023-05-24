@@ -80,20 +80,16 @@
  */
 
 ///// RemoteDebug configuration
-
 #include "RemoteDebugCfg.h"
 
 ///// Debug disable for compile to production/release ?
 ///// as nothing of RemotedDebug is compiled, zero overhead :-)
-
 #ifndef DEBUG_DISABLED
 
 ///// Defines
-
 #define VERSION "3.0.5"
 
 ///// Includes
-
 #include "stdint.h"
 
 #if defined(ESP8266)
@@ -101,7 +97,7 @@
 extern "C" {
 bool system_update_cpu_freq(uint8_t freq);
 }
-#endif
+#endif // ESP8266
 
 #include "Arduino.h"
 #include "Print.h"
@@ -260,7 +256,7 @@ bool RemoteDebug::begin(String hostName, uint16_t port,  uint8_t startingDebugLe
 	if (port != TELNET_PORT) { // Bug: not more can use begin(port)..
 	    return false;
 	}
-	
+
 	TelnetServer.begin();
 	TelnetServer.setNoDelay(true);
 
@@ -1519,7 +1515,7 @@ void RemoteDebug::processCommand() {
 	// Send status to app
 
 	if (_connectedWS) {
-		DebugWS.printf("$app:M:%lu:\n", free);
+		DebugWS.printf("$app:M:%du:\n", free);
 	}
 
 #endif
@@ -1944,10 +1940,9 @@ void RemoteDebug::wsSendInfo() {
 #endif
 
 		DebugWS.println(); // Workaround to not get dirty "[0m" ???
-		DebugWS.printf("$app:V:%s:%s:%c:%lu:%c:N\n", version.c_str(), board.c_str(), features, getFreeMemory(), dbgEnabled);
+		DebugWS.printf("$app:V:%s:%s:%c:%du:%c:N\n", version.c_str(), board.c_str(), features, getFreeMemory(), dbgEnabled);
 
 		// Status of debug level
-
 		wsSendLevelInfo();
 
 		// Send status of debugger
@@ -1959,7 +1954,6 @@ void RemoteDebug::wsSendInfo() {
 void RemoteDebug::wsSendLevelInfo() {
 
 	// Send debug level info to app
-
 	if (_connectedWS) {
 		DebugWS.printf("$app:L:%u\n", _clientDebugLevel);
 	}
@@ -2023,9 +2017,6 @@ void RemoteDebug::sendTelnetCommand(uint8_t command, uint8_t option) {
 #else // DEBUG_DISABLED
 
 /////// All debug is disabled, this include is to define empty debug macros
-
 #include "RemoteDebug.h"		// This library
 
 #endif // DEBUG_DISABLED
-
-/////// End

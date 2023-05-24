@@ -8,7 +8,7 @@
     },
     "license": "MIT",
     "frameworks": "arduino",
-    "platforms": "*",
+    "platforms": "platformio/espressif32, platformio/espressif8266",
     "authors": [
         {
             "name": "Joao Lopes"
