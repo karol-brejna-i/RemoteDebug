@@ -21,9 +21,9 @@
 #define REMOTEDEBUGWS_VERSION "0.1.1"
 
 // Internal debug macro - recommended stay disable
-// #define D(fmt, ...)
+#define D(fmt, ...)
 // use the following line to enable debug
-#define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug
+// #define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug
 
 // websocket server
 static WebSocketsServer WebSocketServer(WEBSOCKET_PORT);  // Websocket server on port 81
@@ -96,7 +96,12 @@ boolean RemoteDebugWS::isConnected() {
 
 // Print
 size_t RemoteDebugWS::write(const uint8_t* buffer, size_t size) {
-    D("write: %u characters", size);
+    if (size != 0) {
+        D("write: %u characters", size)
+    } else {
+        return 0;
+    }
+
     for (size_t i = 0; i < size; i++) {
         write((uint8_t)buffer[i]);
     }
@@ -217,7 +222,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
             if (_callbacks) {
                 _callbacks->onDisconnect();
             }
-
     }
 }
 

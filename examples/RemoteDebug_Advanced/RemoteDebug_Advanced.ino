@@ -36,11 +36,11 @@
 #include <DNSServer.h>
 
 #include "ESPmDNS.h"
-#endif // USE_MDNS
+#endif  // USE_MDNS
 
 #ifdef WEB_SERVER_ENABLED
 #include <WebServer.h>
-#endif // WEB_SERVER_ENABLED
+#endif  // WEB_SERVER_ENABLED
 
 #else
 #error "For now, RemoteDebug support only boards Espressif, as ESP8266 and ESP32"
@@ -510,7 +510,7 @@ void initializeOTA() {
     ArduinoOTA.begin();
 }
 
-#endif // USE_ARDUINO_OTA
+#endif  // USE_ARDUINO_OTA
 
 #ifdef WEB_SERVER_ENABLED
 void handleRoot() {
@@ -532,4 +532,4 @@ void handleNotFound() {
     HTTPServer.send(404, "text/plain", message);
 }
 
-#endif // WEB_SERVER_ENABLED
+#endif  // WEB_SERVER_ENABLED

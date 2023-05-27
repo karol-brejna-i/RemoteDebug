@@ -2,16 +2,55 @@
 
 A library for ESP2866 and ESP32 for debuging projects over WiFi.
 
-RemoteDebug sets up a TCP/IP server, that you connect to using telnet or using a dedicated web app.
+RemoteDebug sets up a TCP/IP server, that you connect to using telnet or websockets (using a dedicated web app).
 
 This project is a fork of not supported (as it seems, last update on May 9, 2019) [RemoteDebug](https://github.com/JoaoLopesF/RemoteDebug) library by Joao Lopes.
 The API is fully compatible. In addition, we have some critical bug fixes and feature improvements.
 
-See [old project readme](./old_README.md) for more background.
+See [old project readme](extras/old_README.md) for more background.
 
 ## Features
 
-The same as the original library.
+The same as the original library:
+
+- Ability to see debug messages on the serial monitor
+- Ability to see debug messages on the telnet client
+- Ability to see debug messages on the web app (WebSockets)
+- Display free memory, basic profiling info, ESP SDK version, etc.
+- Ability to send predefined commands to the app -- change log level, reset the device, etc.
+- Ability to send custom commands to the app -- the programmer can define some commands to be executed on the device
+
+## Usage
+
+See the [Simple example description](#simple-example) below to learn, how to use the library in your project.
+
+In general, you need to do the following:
+
+- include the library header file
+- create an instance of the RemoteDebug class
+- initialize the library in the setup function
+- call the handle function in the loop function
+
+When you want to log something, you can use the following single line macros:
+
+```cpp
+debugV("* This is a message of debug level VERBOSE");
+debugD("* This is a message of debug level DEBUG");
+debugI("* This is a message of debug level INFO");
+debugW("* This is a message of debug level WARNING");
+debugE("* This is a message of debug level ERROR");
+```
+
+or use a snippet like below (for longer logging fragments, and lower overhead):
+
+```cpp
+#ifndef DEBUG_DISABLED
+       if (Debug.isActive(Debug.<level>)) { // change <level> to expected log level
+           Debug.printf("some info: %d %s\n", number, str);
+           Debug.println("more info");
+       }
+#endif
+```
 
 ## Examples
 
@@ -37,7 +76,6 @@ And this is how it looks like when we use telnet:
 
 [![asciicast](https://asciinema.org/a/587830.svg)](https://asciinema.org/a/587830) [![asciicast](https://asciinema.org/a/587831.svg)](https://asciinema.org/a/587831)
 
-
 When you lookl at the [source code]((./examples/simple/simple.ino)) you will find the following key parts:
 
 ```cpp
@@ -62,6 +100,10 @@ Finally in the loop function, you need to call the handle function:
     Debug.handle();
 ```
 
+## Custom commands example
+
+TBD
+
 ## Limitations
 
 The original functionality is not changed. The following limitations are inherited from the original library:
@@ -69,6 +111,7 @@ The original functionality is not changed. The following limitations are inherit
 - doesn't support SSL (technical limitation of the underlying library)
 - doesn't use async websockets (design choice?)
 - supports either telnet or websockets, but not both at the same time (implementation choice)
+- websockets logger doesn't send unicode characters (probably implementation problem)
 
 The library has no tests, nor CI/CD.
 
@@ -80,4 +123,3 @@ Probably, with time some of these limitations will be removed.
   - <https://github.com/JoaoLopesF/RemoteDebug/pull/73>
   - <https://github.com/JoaoLopesF/RemoteDebug/pull/56>
 - MAJOR CHANGE: Removed ArduinoWebsockets from the sources and used the one from the library manager. There is still "a little problem" with <https://github.com/Links2004/arduinoWebSockets> -- it doens't compile under ESP32 (latest version 2.4.1), so we use the older version 2.3.4. This is a temporary solution, until the problem is fixed.
-- 

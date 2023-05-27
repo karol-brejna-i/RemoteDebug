@@ -6,7 +6,7 @@
 #ifndef DEBUG_DISABLED
 
 ///// Defines
-#define VERSION "3.0.5"
+#define VERSION "3.1.0"
 
 ///// Includes
 #include "stdint.h"
@@ -271,12 +271,10 @@ void RemoteDebug::handle() {
 
     if (_silence && _silenceTimeout > 0 && millis() >= _silenceTimeout) {
         // Get out of silence mode
-
         silence(false, true);
     }
 
     // Debug level is profiler -> set the level before
-
     if (_clientDebugLevel == PROFILER) {
         if (millis() > _levelProfilerDisable) {
             _clientDebugLevel = _levelBeforeProfiler;
@@ -287,7 +285,6 @@ void RemoteDebug::handle() {
 #ifdef ALPHA_VERSION  // In test, not good yet
 
     // Automatic change to profiler level if time between handles is greater than n millis
-
     if (_autoLevelProfiler > 0 && _clientDebugLevel != PROFILER) {
         uint32_t diff = (millis() - lastTime);
 
@@ -377,7 +374,6 @@ void RemoteDebug::handle() {
     _connected = (TelnetClient && TelnetClient.connected());
 
     // Get command over telnet
-
     if (_connected) {
         char last = ' ';  // To avoid process two times the "\r\n"
 
@@ -401,12 +397,10 @@ void RemoteDebug::handle() {
 
             } else if (isPrintable(character)) {
                 // Concat
-
                 _command.concat(character);
             }
 
             // Last char
-
             last = character;
         }
     }
@@ -465,20 +459,15 @@ void RemoteDebug::handle() {
 #endif
 
 #ifdef DEBUGGER_ENABLED
-
     // For Simple software debugger - based on SerialDebug Library
-
     // Changed handle debugger logic - 2018-03-01
-
     if (_callbackDbgEnabled && _callbackDbgHandle) {  // Calbacks ok ?
 
         boolean callHandle = false;
 
         if (dbgLastConnected != connected) {  // Change connection -> always call
-
             dbgLastConnected = connected;
             callHandle = true;
-
         } else if (millis() >= dbgTimeHandle) {
             if (_callbackDbgEnabled()) {  // Only if it is enabled
                 callHandle = true;
@@ -487,11 +476,8 @@ void RemoteDebug::handle() {
 
         if (callHandle) {
             // Call the handle
-
             _callbackDbgHandle(true);
-
             // Save time
-
             dbgTimeHandle = millis() + DEBUGGER_HANDLE_TIME;
         }
     }
@@ -657,19 +643,14 @@ boolean RemoteDebug::isActive(uint8_t debugLevel) {
     //	Password ok (if enabled) - 18/08/18
 
 #if not WEBSOCKET_DISABLED
-
     boolean ret = (debugLevel >= _clientDebugLevel &&
                    !_silence &&
                    (_connected || _connectedWS || _serialEnabled));
-
 #else  // Telnet only
-
     boolean ret = (debugLevel >= _clientDebugLevel &&
                    !_silence &&
                    (_connected || _serialEnabled));
-
 #endif
-
     if (ret) {
         _lastDebugLevel = debugLevel;
     }
@@ -678,13 +659,11 @@ boolean RemoteDebug::isActive(uint8_t debugLevel) {
 }
 
 // Set help for commands over telnet set by sketch
-
 void RemoteDebug::setHelpProjectsCmds(String help) {
     _helpProjectCmds = help;
 }
 
 // Set callback of sketch function to process project messages
-
 void RemoteDebug::setCallBackProjectCmds(void (*callback)()) {
     _callbackProjectCmds = callback;
 }
@@ -694,7 +673,6 @@ void RemoteDebug::setCallBackNewClient(void (*callback)()) {
 }
 
 // Print
-
 size_t RemoteDebug::write(const uint8_t* buffer, size_t size) {
     // Process buffer
     // Insert due a write bug w/ latest Esp8266 SDK - 17/08/18
@@ -708,11 +686,8 @@ size_t RemoteDebug::write(const uint8_t* buffer, size_t size) {
 
 size_t RemoteDebug::write(uint8_t character) {
     // Write logic
-
     uint32_t elapsed = 0;
-
     size_t ret = 0;
-
     String colorLevel = "";
 
     // Connected ?
@@ -1181,16 +1156,12 @@ void RemoteDebug::processCommand() {
 #endif
 
 #if defined(ESP8266)
-
     } else if (_command == "cpu80") {
-        // Change ESP8266 CPU para 80 MHz
-
+        // Change ESP8266 CPU to 80 MHz
         system_update_cpu_freq(80);
         debugPrintln("CPU ESP8266 changed to: 80 MHz");
-
     } else if (_command == "cpu160") {
-        // Change ESP8266 CPU para 160 MHz
-
+        // Change ESP8266 CPU to 160 MHz
         system_update_cpu_freq(160);
         debugPrintln("CPU ESP8266 changed to: 160 MHz");
 
@@ -1294,21 +1265,17 @@ void RemoteDebug::processCommand() {
 
     } else if (_command.startsWith("p ")) {
         // Show profiler with minimal time
-
         if (options.length() > 0) {  // With minimal time
             int32_t aux = options.toInt();
             if (aux > 0) {  // Valid number
                 _showProfiler = true;
                 _minTimeShowProfiler = aux;
-                debugPrintf(
-                    "* Show profiler: On (with minimal time: %u)\r\n",
-                    _minTimeShowProfiler);
+                debugPrintf("* Show profiler: On (with minimal time: %u)\r\n", _minTimeShowProfiler);
             }
         }
 
     } else if (_command == "P") {
         // Debug level profile
-
         _levelBeforeProfiler = _clientDebugLevel;
         _clientDebugLevel = PROFILER;
 
@@ -1325,9 +1292,7 @@ void RemoteDebug::processCommand() {
             }
         }
 
-        debugPrintf(
-            "* Debug level set to Profiler (disable in %u millis)\r\n",
-            _levelProfilerDisable);
+        debugPrintf("* Debug level set to Profiler (disable in %u millis)\r\n", _levelProfilerDisable);
 
     } else if (_command == "A") {
         // Auto debug level profile
@@ -1341,17 +1306,13 @@ void RemoteDebug::processCommand() {
             }
         }
 
-        debugPrintf(
-            "* Auto profiler debug level active (time >= %u millis)\r\n",
-            _autoLevelProfiler);
+        debugPrintf("* Auto profiler debug level active (time >= %u millis)\r\n", _autoLevelProfiler);
 
     } else if (_command == "c") {
         // Show colors
 
         _showColors = !_showColors;
-
-        debugPrintf("* Show colors: %s\r\n",
-                    (_showColors) ? "On" : "Off");
+        debugPrintf("* Show colors: %s\r\n", (_showColors) ? "On" : "Off");
 
     } else if (_command.startsWith("filter ") && options.length() > 0) {
         setFilter(options);
@@ -1597,14 +1558,12 @@ uint32_t RemoteDebug::getFreeMemory() {
 }
 
 // Is CR or LF ?
-
 boolean RemoteDebug::isCRLF(char character) {
     return (character == '\r' || character == '\n');
 }
 
 // Expand characters as CR/LF to \\r, \\n
 // TODO: make this for another chars not printable
-
 String RemoteDebug::expand(String string) {
     string.replace("\r", "\\r");
     string.replace("\n", "\\n");
