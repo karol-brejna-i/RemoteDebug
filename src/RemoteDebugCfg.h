@@ -1,4 +1,3 @@
-
 /*
  * Header for RemoteDebugCfg
  *
@@ -42,17 +41,16 @@
 
 ///// Debug disable for compile to production/release
 ///// as nothing of RemotedDebug is compiled, zero overhead :-)
-//#define DEBUG_DISABLED true
+// #define DEBUG_DISABLED true
 
 // Debug enabled ?
-
 #ifndef DEBUG_DISABLED
 
 ///// Port for telnet server
 #define TELNET_PORT 23
 
 // Disable auto function for debug macros? (uncomment this if not want this)
-//#define DEBUG_DISABLE_AUTO_FUNC true
+// #define DEBUG_DISABLE_AUTO_FUNC true
 
 // Simple password request - left commented if not need this - 18/07/18
 // Notes:
@@ -82,37 +80,30 @@
 // Uncomment this to disable it
 #define CLIENT_BUFFERING true
 #ifdef CLIENT_BUFFERING
-#define DELAY_TO_SEND 10 // Time to send buffer
-#define MAX_SIZE_SEND 1460 // Maximum size of packet (limit of TCP/IP)
+#define DELAY_TO_SEND 10    // Time to send buffer
+#define MAX_SIZE_SEND 1460  // Maximum size of packet (limit of TCP/IP)
 #endif
 
 // Enable if you test features yet in development
-//#define ALPHA_VERSION true
+// #define ALPHA_VERSION true
 
 // Debugger support enabled ?
 // Comment this to disable it
 #define DEBUGGER_ENABLED true
 #ifdef DEBUGGER_ENABLED
-#define DEBUGGER_HANDLE_TIME 850 // Interval to call handle of debugger - equal to implemented in debugger
+#define DEBUGGER_HANDLE_TIME 850  // Interval to call handle of debugger - equal to implemented in debugger
 // App have debugger elements on screen ?
 // Note: app not have it yet
-//#define DEBUGGER_SEND_INFO true
+// #define DEBUGGER_SEND_INFO true
 #endif
 
-///// Websocket server to support debug over web browser (RemoteDebugApp)
-// Uncomment this to disable it
-//#define WEBSOCKET_DISABLED true
-
-///////////// For RemoteDebugWS ///////////////////
-
+// WebSockets enabled by default, for backward compatibility
 #ifndef WEBSOCKET_DISABLED
-
-// Websocket port
+#define WEBSOCKET_DISABLED false
+#endif
+///////////// For RemoteDebugWS ///////////////////
+#if not WEBSOCKET_DISABLED
 #define WEBSOCKET_PORT 8232
-
-// Library arduinoWebSockets already installed, uncomment to use it
-// Do this if you receive errors of multiple definition ...
-//#define USE_LIB_WEBSOCKET true
 #endif
 
 ///////////// For RemoteDebugger ///////////////////
@@ -121,15 +112,12 @@
 // Used internally in SerialDebug and in public API
 // If is a low memory board, like AVR, all strings in SerialDebug is using flash memory
 // If have RAM memory, this is more fast than flash
-//#define DEBUG_USE_FLASH_F true
+// #define DEBUG_USE_FLASH_F true
 
 // For Espressif boards, default is not flash support for printf,
 // due it have a lot of memory and Serial.printf is not compatible with it
 // If you need more memory, can force it:
-//#define DEBUG_USE_FLASH_F true
+// #define DEBUG_USE_FLASH_F true
 
 #endif /* DEBUG_DISABLED */
-
 #endif /* REMOTEDEBUGCFG_H_ */
-
-////// End
