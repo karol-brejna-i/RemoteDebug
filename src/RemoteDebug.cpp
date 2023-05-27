@@ -537,16 +537,12 @@ void RemoteDebug::onConnection(boolean connected) {
 
     D("rd onconn %d", connected);
 
-    _bufferPrint = "";  // Clean buffer
-
+    _bufferPrint = "";            // Clean buffer
     _lastTimeCommand = millis();  // To mark time for inactivity
-
-    _command = "";      // Clear command
-    _lastCommand = "";  // Clear las command
-
-    _lastTimePrint = millis();  // Clear the time
-
-    _silence = false;  // No silence
+    _command = "";                // Clear command
+    _lastCommand = "";            // Clear las command
+    _lastTimePrint = millis();    // Clear the time
+    _silence = false;             // No silence
     _silenceTimeout = 0;
 
 #ifdef CLIENT_BUFFERING
@@ -717,41 +713,31 @@ size_t RemoteDebug::write(uint8_t character) {
 
     size_t ret = 0;
 
-#ifdef COLOR_NEW_SYSTEM
     String colorLevel = "";
-#endif
 
     // Connected ?
-
 #if not WEBSOCKET_DISABLED
     boolean connected = (_connected || _connectedWS);
 #else
     boolean connected = _connected;
 #endif
 
-    // In silente mode now ?
-
+    // In silent mode now ?
     if (_silence) {
         return 0;
     }
 
     // New line writted before ?
-
     if (_newLine) {
 #ifdef DEBUGGER_ENABLED
-
         // For Simple software debugger - based on SerialDebug Library
-
         // Changed handle debugger logic - 2018-02-29
-
         if (!_showRaw) {  // Not for raw mode
 
             if (_callbackDbgEnabled && _callbackDbgEnabled()) {  // Callbacks ok
 
                 if (connected && _callbackDbgEnabled()) {  // Only call if is connected and debugger is enabled
-
                     // Call the handle
-
                     _callbackDbgHandle(false);
                 }
             }
@@ -761,10 +747,7 @@ size_t RemoteDebug::write(uint8_t character) {
         String show = "";
 
         // Not in raw mode (only data)
-
         if (!_showRaw) {
-#ifdef COLOR_NEW_SYSTEM
-
             // New color system
             if (_showColors) {
                 switch (_lastDebugLevel) {
@@ -788,7 +771,6 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show debug level
-
             if (_showDebugLevel) {
                 switch (_lastDebugLevel) {
                     case PROFILER:
@@ -813,7 +795,6 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show time in millis
-
             if (_showTime) {
                 if (show != "") {
                     show.concat(" ");
@@ -824,7 +805,6 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show profiler (time between messages)
-
             if (_showProfiler) {
                 elapsed = (millis() - _lastTimePrint);
                 boolean resetColors = false;
@@ -857,132 +837,21 @@ size_t RemoteDebug::write(uint8_t character) {
                 show.concat("ms");
                 if (resetColors) {
                     show.concat(COLOR_RESET);
-#ifdef COLOR_NEW_SYSTEM
                     show.concat(colorLevel);
-#endif
                 }
                 _lastTimePrint = millis();
             }
-
-#else  // Old colors way
-
-            // Show debug level
-
-            if (_showDebugLevel) {
-                show = "(";
-                if (_showColors == false) {
-                    switch (_lastDebugLevel) {
-                        case PROFILER:
-                            show.concat("P");
-                            break;
-                        case VERBOSE:
-                            show.concat("V");
-                            break;
-                        case DEBUG:
-                            show.concat("D");
-                            break;
-                        case INFO:
-                            show.concat("I");
-                            break;
-                        case WARNING:
-                            show.concat("W");
-                            break;
-                        case ERROR:
-                            show.concat("E");
-                            break;
-                    }
-                } else {
-                    switch (_lastDebugLevel) {
-                        case PROFILER:
-                            show.concat("P");
-                            break;
-                        case VERBOSE:
-                            show.concat("V");
-                            break;
-                        case DEBUG:
-                            show = COLOR_BACKGROUND_GREEN;
-                            show.concat("D");
-                            break;
-                        case INFO:
-                            show = COLOR_BACKGROUND_WHITE;
-                            show.concat("I");
-                            break;
-                        case WARNING:
-                            show = COLOR_BACKGROUND_YELLOW;
-                            show.concat("W");
-                            break;
-                        case ERROR:
-                            show = COLOR_BACKGROUND_RED;
-                            show.concat("E");
-                            break;
-                    }
-                    if (show.length() > 1) {
-                        show.concat(COLOR_RESET);
-                    }
-                }
-            }
-
-            // Show time in millis
-
-            if (_showTime) {
-                if (show != "")
-                    show.concat(" ");
-                show.concat("t:");
-                show.concat(millis());
-                show.concat("ms");
-            }
-
-            // Show profiler (time between messages)
-
-            if (_showProfiler) {
-                elapsed = (millis() - _lastTimePrint);
-                boolean resetColors = false;
-                if (show != "")
-                    show.concat(" ");
-                if (_showColors) {
-                    if (elapsed < 250) {
-                        ;  // not color this
-                    } else if (elapsed < 1000) {
-                        show.concat(COLOR_BACKGROUND_CYAN);
-                        resetColors = true;
-                    } else if (elapsed < 3000) {
-                        show.concat(COLOR_BACKGROUND_YELLOW);
-                        resetColors = true;
-                    } else if (elapsed < 5000) {
-                        show.concat(COLOR_BACKGROUND_MAGENTA);
-                        resetColors = true;
-                    } else {
-                        show.concat(COLOR_BACKGROUND_RED);
-                        resetColors = true;
-                    }
-                }
-                show.concat("p:^");
-                show.concat(formatNumber(elapsed, 4));
-                show.concat("ms");
-                if (resetColors) {
-                    show.concat(COLOR_RESET);
-                }
-                _lastTimePrint = millis();
-            }
-
-#endif
-
         } else {  // Raw mode - only data - e.g. used for debugger messages
-
-#ifdef COLOR_NEW_SYSTEM
             show.concat(COLOR_RAW);
-#endif
         }
 
         // Show anything ?
-
         if (show != "") {
             if (!_showRaw) {
                 show.concat(") ");
             }
 
             // Write to telnet buffered
-
             if (connected || _serialEnabled) {  // send data to Client
                 _bufferPrint = show;
             }
@@ -992,11 +861,9 @@ size_t RemoteDebug::write(uint8_t character) {
     }
 
     // Print ?
-
     boolean doPrint = false;
 
     // New line ?
-
     if (character == '\n') {
         _bufferPrint.concat("\r");  // Para clientes windows - 29/01/17
 
@@ -1004,18 +871,14 @@ size_t RemoteDebug::write(uint8_t character) {
         doPrint = true;
 
     } else if (_bufferPrint.length() == BUFFER_PRINT) {  // Limit of buffer
-
         doPrint = true;
     }
 
     // Write to telnet Buffered
-
     _bufferPrint.concat((char)character);
 
     // Send the characters buffered by print.h
-
     if (doPrint) {  // Print the buffer
-
         boolean noPrint = false;
 
         if (_showProfiler && elapsed < _minTimeShowProfiler) {  // Profiler time Minimal
@@ -1031,11 +894,8 @@ size_t RemoteDebug::write(uint8_t character) {
         }
 
         if (noPrint == false) {
-#ifdef COLOR_NEW_SYSTEM
             if (_showColors) _bufferPrint.concat(COLOR_RESET);
-#endif
             // Send to telnet or websocket (buffered)
-
             boolean sendToClient = connected;
 
             if (_password != "" && !_passwordOk) {  // With no password -> no telnet output - 2018-10-19
@@ -1046,15 +906,12 @@ size_t RemoteDebug::write(uint8_t character) {
 
 #ifndef CLIENT_BUFFERING
                 debugPrint(_bufferPrint);
-#else  // Cliente buffering
-
+#else  // Client buffering
                 uint8_t size = _bufferPrint.length();
 
                 // Buffer too big ?
-
                 if ((_sizeBufferSend + size) >= MAX_SIZE_SEND) {
                     // Send it
-
                     debugPrint(_bufferSend);
                     _bufferSend = "";
                     _sizeBufferSend = 0;
@@ -1062,7 +919,6 @@ size_t RemoteDebug::write(uint8_t character) {
                 }
 
                 // Add to buffer of send
-
                 _bufferSend.concat(_bufferPrint);
                 _sizeBufferSend += size;
 
@@ -1078,24 +934,17 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Echo to serial (not buffering it)
-
             if (_serialEnabled) {
                 Serial.print(_bufferPrint);
             }
         }
 
         // Empty the buffer
-
         ret = _bufferPrint.length();
         _bufferPrint = "";
     }
-
-    // Retorna
-
     return ret;
 }
-
-////// Private
 
 /**
  * @brief Show help of commands
@@ -1215,8 +1064,7 @@ void RemoteDebug::showHelp() {
 #endif
 
     help.concat("\r\n");
-    help.concat(
-        "* Please type the command and press enter to execute.(? or h for this help)\r\n");
+    help.concat("* Please type the command and press enter to execute.(? or h for this help)\r\n");
     help.concat("***\r\n");
 
     // Send to client
@@ -1326,7 +1174,6 @@ void RemoteDebug::processCommand() {
 #if not WEBSOCKET_DISABLED
 
         // Send status to app
-
         if (_connectedWS) {
             DebugWS.printf("$app:M:%du:\n", free);
         }

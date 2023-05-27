@@ -38,9 +38,6 @@
 
 //////// Defines
 
-// New color system (comment this to return to old system) - 2019-02-27
-#define COLOR_NEW_SYSTEM true
-
 // ANSI Colors
 #define COLOR_RESET "\x1B[0m"
 #define COLOR_BLACK "\x1B[0;30m"
@@ -70,7 +67,6 @@
 #define COLOR_BACKGROUND_CYAN "\x1B[46m"
 #define COLOR_BACKGROUND_WHITE "\x1B[47m"
 
-#ifdef COLOR_NEW_SYSTEM
 // New system of Colors
 // Note: this colors is not equals to SerialDebug colors, due using standard 16 colors of Ansi, for compatibility
 #define COLOR_VERBOSE COLOR_GREEN
@@ -82,7 +78,6 @@
 #define COLOR_WARNING COLOR_LIGHT_CYAN
 #define COLOR_ERROR COLOR_LIGHT_RED
 #define COLOR_RAW COLOR_WHITE  // COLOR_MAGENTA
-#endif
 
 //////// Includes
 #include "Arduino.h"

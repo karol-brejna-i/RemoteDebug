@@ -21,9 +21,9 @@
 #define REMOTEDEBUGWS_VERSION "0.1.1"
 
 // Internal debug macro - recommended stay disable
-#define D(fmt, ...)
+// #define D(fmt, ...)
 // use the following line to enable debug
-// #define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug
+#define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug
 
 // websocket server
 static WebSocketsServer WebSocketServer(WEBSOCKET_PORT);  // Websocket server on port 81
@@ -87,12 +87,6 @@ void RemoteDebugWS::disconnect() {
 // Handle
 void RemoteDebugWS::handle() {
     WebSocketServer.loop();
-
-    //	// Test
-    //
-    //	if (_webSocketConnected) {
-    //		WebSocketServer.sendTXT(_webSocketConnected, "AAAAAAAAA\n");
-    //	}
 }
 
 // Is connected ?
@@ -111,7 +105,6 @@ size_t RemoteDebugWS::write(const uint8_t* buffer, size_t size) {
 }
 
 size_t RemoteDebugWS::write(uint8_t character) {
-    D("write: %c", character);
     static String buffer = "";
     size_t ret = 0;
 
@@ -209,7 +202,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
             }
 
             break;
-
+        case WStype_PONG:
+            D("Pong")
+            break;
+        case WStype_PING:
+            D("Ping")
+            break;
         default:
             D("WStype %x not handled ", type)
             // Disconnected
