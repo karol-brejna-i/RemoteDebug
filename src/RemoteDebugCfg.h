@@ -1,4 +1,3 @@
-
 /*
  * Header for RemoteDebugCfg
  *
@@ -45,7 +44,6 @@
 // #define DEBUG_DISABLED true
 
 // Debug enabled ?
-
 #ifndef DEBUG_DISABLED
 
 ///// Port for telnet server
@@ -99,13 +97,12 @@
 // #define DEBUGGER_SEND_INFO true
 #endif
 
-///// Websocket server to support debug over web browser (RemoteDebugApp)
-// Uncomment this to disable it
-// #define WEBSOCKET_DISABLED true
-
-///////////// For RemoteDebugWS ///////////////////
-
+// WebSockets enabled by default, for backward compatibility
 #ifndef WEBSOCKET_DISABLED
+#define WEBSOCKET_DISABLED false
+#endif
+///////////// For RemoteDebugWS ///////////////////
+#if not WEBSOCKET_DISABLED
 #define WEBSOCKET_PORT 8232
 #endif
 

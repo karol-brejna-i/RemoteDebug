@@ -1,26 +1,4 @@
-
-/*
- * Libraries Arduino
- * *****************
- * Library : Remote debug - debug over telnet - for Esp8266 (NodeMCU) or ESP32
- * Author  : Joao Lopes
- * File    : RemoteDebugWS - web socket server to RemoteDebugAapp
- * Comments: Web socket server uses the arduinWebSockets library (https://github.com/Links2004/arduinoWebSockets)
- *           The author uses Eclise IDE (sloeber) to made this source
- * License : See RemoteDebugWS.h
- *
- * Versions:
- *  ------	----------	-----------------
- *  0.2.0	2019-03-19  All public configurations (#defines) have moved to RemoteDebugCfg.h, to facilitate changes for anybody.
- *  					Several adjustments.
- *  0.1.0	2019-03-11	Fist version
- *
- */
-
-/* TODO:
- */
-
-///// RemoteDebug configuration
+///// RemoteDebug configuration]
 #include "RemoteDebugCfg.h"
 
 // Debug enabled ?
@@ -29,8 +7,8 @@
 /////// Includes
 #include "RemoteDebugWS.h"
 
-// Only if web socket (RemoteDebugApp) is enabled
-#ifndef WEBSOCKET_DISABLED
+// Only if  (RemoteDebugApp) is enabled
+#if not WEBSOCKET_DISABLED
 
 #include <WebSockets.h>  // https://github.com/Links2004/arduinoWebSockets
 #include <WebSocketsClient.h>
@@ -39,31 +17,24 @@
 #include "Arduino.h"
 #include "RemoteDebug.h"
 
-/////// Defines
-
 // Version
 #define REMOTEDEBUGWS_VERSION "0.1.1"
 
 // Internal debug macro - recommended stay disable
-#define D(fmt, ...)  // Without this
-// #define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__) 	// Serial debug
+#define D(fmt, ...)
+// use the following line to enable debug
+// #define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug
 
-/////// Variables
-
-// Arduino websocket server (to comunicate with RemoteDebugApp)
+// websocket server
 static WebSocketsServer WebSocketServer(WEBSOCKET_PORT);  // Websocket server on port 81
 
 // Variables used by webSocketEvent
 static int8_t _webSocketConnected = WS_NOT_CONNECTED;  // Client is connected ?
-
-static RemoteDebugWSCallbacks* _callbacks;  // callbacks to RemoteDebug
-
-////// Methods
+static RemoteDebugWSCallbacks* _callbacks;             // callbacks to RemoteDebug
 
 // Initialize the socket server
 void RemoteDebugWS::begin(RemoteDebugWSCallbacks* callbacks) {
-    // Initialize web socket (RemoteDebugApp)
-
+    // Initialize WebSockets
     WebSocketServer.begin();                  // start the websocket server
     WebSocketServer.onEvent(webSocketEvent);  // if there's an incomming websocket message, go to function 'webSocketEvent'
 
@@ -71,15 +42,16 @@ void RemoteDebugWS::begin(RemoteDebugWSCallbacks* callbacks) {
     _callbacks = callbacks;
 
     // Debug
-    D("socket server started");
+    D("socket server started")
 }
 
 // Finalize the socket server
 void RemoteDebugWS::stop() {
-    // Finalize web socket (RemoteDebugApp)
+    // Finalize  (RemoteDebugApp)
 
     WebSocketServer.close();
     _webSocketConnected = WS_NOT_CONNECTED;
+    D("socket server stopped")
 }
 
 void RemoteDebugWS::disconnectAllClients() {
@@ -93,11 +65,12 @@ void RemoteDebugWS::disconnectAllClients() {
     if (_callbacks) {
         _callbacks->onDisconnect();
     }
+    D("disconnectAllClients")
 }
 
 void RemoteDebugWS::disconnect() {
+    D("disconnect")
     // Disconnect actual clients
-
     if (_webSocketConnected != WS_NOT_CONNECTED) {
         WebSocketServer.disconnect(_webSocketConnected);
 
@@ -129,8 +102,7 @@ boolean RemoteDebugWS::isConnected() {
 
 // Print
 size_t RemoteDebugWS::write(const uint8_t* buffer, size_t size) {
-    // Process buffer
-
+    D("write: %u characters", size);
     for (size_t i = 0; i < size; i++) {
         write((uint8_t)buffer[i]);
     }
@@ -139,6 +111,7 @@ size_t RemoteDebugWS::write(const uint8_t* buffer, size_t size) {
 }
 
 size_t RemoteDebugWS::write(uint8_t character) {
+    D("write: %c", character);
     static String buffer = "";
     size_t ret = 0;
 
@@ -185,7 +158,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
             break;
         case WStype_CONNECTED:  // if a new websocket connection is established
         {
-#ifdef D  // serial debug
+#ifdef D
             IPAddress ip = WebSocketServer.remoteIP(num);
             D("[%u] Connected from %d.%d.%d.%d url: %s", num, ip[0], ip[1], ip[2], ip[3], payload);
 #endif
@@ -193,6 +166,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
             // Have in another connection
             // One connection to reduce overheads
             if (num != _webSocketConnected) {
+                D("Another connection, closing ...")
                 WebSocketServer.sendTXT(_webSocketConnected, "* Closing client connection ...");
                 WebSocketServer.disconnect(_webSocketConnected);
             }
@@ -225,30 +199,27 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
         } break;
 
         case WStype_ERROR:  // if new text data is received
-            D("Error");
+            D("Error")
             // Disconnected
-
             _webSocketConnected = WS_NOT_CONNECTED;
 
             // Callback
-
             if (_callbacks) {
                 _callbacks->onDisconnect();
             }
 
             break;
-        default:
-            // Disconnected
 
+        default:
+            D("WStype %x not handled ", type)
+            // Disconnected
             _webSocketConnected = WS_NOT_CONNECTED;
 
             // Callback
-
             if (_callbacks) {
                 _callbacks->onDisconnect();
             }
 
-            D("WStype %x not handled ", type);
     }
 }
 

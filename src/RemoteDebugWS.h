@@ -31,16 +31,13 @@
 #pragma once
 
 ///// RemoteDebug configuration
-
 #include "RemoteDebugCfg.h"
 
 // Debug enabled ?
-
 #ifndef DEBUG_DISABLED
 
-// Only if Web socket enabled (RemoteDebugApp)
-
-#ifndef WEBSOCKET_DISABLED
+// Only if  enabled (RemoteDebugApp)
+#if not WEBSOCKET_DISABLED
 
 // Connected
 #define WS_NOT_CONNECTED -1  // Not connected
@@ -50,7 +47,6 @@
 #include <WebSocketsServer.h>
 
 ///// Callbacks class - based in Kolban BLE callback example code
-
 class RemoteDebugWSCallbacks {
    public:
     virtual ~RemoteDebugWSCallbacks() {}
@@ -60,13 +56,8 @@ class RemoteDebugWSCallbacks {
 };
 
 ///// Main Class
-
 class RemoteDebugWS : public Print {
    public:
-    // Constructor
-    // RemoteDebugWS();
-
-    // Methods
     void begin(RemoteDebugWSCallbacks* callbacks);
     void stop();
     void disconnectAllClients();
@@ -78,12 +69,7 @@ class RemoteDebugWS : public Print {
     virtual size_t write(uint8_t);
     virtual size_t write(const uint8_t* buffer, size_t size);
 
-    // Destructor
     ~RemoteDebugWS();
-
-   private:
-    //////// Variables
-    //////// Privates
 };
 
 /////// Prototypes
@@ -99,5 +85,4 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t payload
 #error "aaaah"
 
 #endif  // DEBUG_DISABLED
-
 #endif /* REMOTEDEBUGWS_H_ */
