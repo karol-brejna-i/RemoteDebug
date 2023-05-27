@@ -1,6 +1,6 @@
 {
-    "name": "RemoteDebugFork997",
-    "keywords": "debug, eemote, telnet, WiFi",
+    "name": "RemoteDebug",
+    "keywords": "debug, remote, telnet, WiFi, websockets, dubugging, monitor",
     "description": "Fork of Joao Lopes'es RemoteDebug library with few minor issues resolved.\nOriginal description:\nA library for Arduino to debug projects over WiFi, with web app or telnet client, with Print commands like Serial Monitor.",
     "repository": {
         "type": "git",
@@ -8,22 +8,22 @@
     },
     "license": "MIT",
     "frameworks": "arduino",
-    "platforms": "platformio/espressif32, platformio/espressif8266",
+    "platforms": "espressif32, espressif8266",
     "authors": [
-        {
-            "name": "Joao Lopes"
-        },
         {
             "name": "Karol Brejna",
             "maintainer": true
 
+        },
+        {
+            "name": "Joao Lopes"
         }
     ],
     "examples":  [
         {
-            "name": "Basic",
-            "base": "examples/RemoteDebug_Basic",
-            "files": ["RemoteDebug_Basic.ino"]
+            "name": "Simple",
+            "base": "examples/simple",
+            "files": ["simple.ino"]
         },        {
             "name": "Debugger",
             "base": "examples/RemoteDebug_Debugger",
