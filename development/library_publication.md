@@ -14,7 +14,7 @@ For publishing the library in the PlatformIO Registry, perform the following ste
 
 - Test the library before releasing
 - Update the library version (in the sources and in the manifest)
-- Create a GitHUB release
+- Create a GitHub release
 - Publish the library in the PlatformIO Registry
 
 ### Test the library before releasing
@@ -49,3 +49,16 @@ EOM
 gh release create $VERSION --title "$VERSION" --notes "$RELEASE_NOTES"
 ```
 
+### Publish the library in the PlatformIO Registry
+
+Package the library with:
+
+```bash
+pio pkg pack
+```
+
+Publish the library with:
+
+```bash
+pio pkg publish
+```
