@@ -5,9 +5,6 @@
 ///// as nothing of RemotedDebug is compiled, zero overhead :-)
 #ifndef DEBUG_DISABLED
 
-///// Defines
-#define VERSION "3.1.0"
-
 ///// Includes
 #include "stdint.h"
 
