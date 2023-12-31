@@ -8,13 +8,9 @@ VERSION=$1
 
 VERSION_NO=v${VERSION}
 read -r -d '' RELEASE_NOTES << EOM
-* Add platformio project
-* Remove websocket sources, use external dependency instead
-* Make websockets work again
-* Remove RemoteDebug_Advanced example; replaced by 'simple' example
-* Remove "old color mode" code
-* Add some documentation (example, usage, publishing the library)
-* Bump version to 4.0.0
+* Clean simple example a bit
+* Add library.properties (for Arduino IDE)
+* Bump version to 4.0.1
 EOM
 
 gh repo set-default karol-brejna-i/RemoteDebug

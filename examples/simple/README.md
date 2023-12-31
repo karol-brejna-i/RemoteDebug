@@ -2,12 +2,13 @@
 
 This is a very basic example of RemoteDebug library usage.
 
-This example connects to WiFi (remember to set up ssid and password in the code), and initialize the RemoteDebug library.
+This example connects to WiFi (remember to set up SSID and password in the code), and initializes the RemoteDebug library.
 
 After that, the following logic is executed:
 
-- Each second, the led is blinked and a message is sent to RemoteDebug (in verbose level)
+- Each second, the built-in led is blinked and a message is sent to RemoteDebug (in verbose level)
 - Each 5 seconds, a message is sent to RemoteDebug in all levels (verbose, debug, info, warning and error) and a function is called
+
 Before running, decide if you want to use mDNS (change the define USE_MDNS to true or false).
 
 Please, see the following "video" to see how the app "looks like" when we use serial monitor (the device is connected to the computer using USB cable):
