@@ -45,7 +45,7 @@ bool system_update_cpu_freq(uint8_t freq);
 #include "RemoteDebugWS.h"
 #endif
 
-// Internal debug macro - recommended stay disable
+// Internal debug macro - recommended to stay disabled
 #define D(fmt, ...)
 // use the following line to enable debug
 // #define D(fmt, ...) Serial.printf("rd: " fmt "\n", ##__VA_ARGS__);  // Serial debug
@@ -116,7 +116,7 @@ class MyRemoteDebugCallbacks : public RemoteDebugWSCallbacks {
 
         _connectedWS = true;
 
-        // Is telnet connected -> disconnect it, due reduce overheads
+        // Is telnet connected -> disconnect it to reduce overhead
         if (_instance->isConnected()) {
             D("disconnect telnet, because WS is connected")
             _instance->disconnect(true);
@@ -214,7 +214,7 @@ WiFiClient* RemoteDebug::getTelnetClient() {
 
 #endif
 
-// Set the password for telnet - thanks @jeroenst for suggest thist method
+// Set the password for telnet - thanks @jeroenst for suggesting this method
 
 void RemoteDebug::setPassword(String password) {
     _password = password;
@@ -260,7 +260,7 @@ void RemoteDebug::handle() {
 #endif
 
 #ifdef DEBUGGER_ENABLED
-    static uint32_t dbgTimeHandle = millis();  // To avoid call the handler desnecessary
+    static uint32_t dbgTimeHandle = millis();  // To avoid calling the handler unnecessarily
     static boolean dbgLastConnected = false;   // Last is connected ?
 #endif
 
@@ -288,7 +288,7 @@ void RemoteDebug::handle() {
         if (diff >= _autoLevelProfiler) {
             _levelBeforeProfiler = _clientDebugLevel;
             _clientDebugLevel = PROFILER;
-            _levelProfilerDisable = 1000;  // Disable it at 1 sec
+            _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Disable after default timeout
 
             debugPrintf("* Debug level profile active now - time between handels: %u\r\n", diff);
         }
@@ -357,7 +357,7 @@ void RemoteDebug::handle() {
         TelnetClient.flush();           // clear input buffer, else you get strange characters
 
         // Empty buffer
-        delay(100);
+        delay(CONNECTION_BUFFER_CLEAR_DELAY_MS);
 
         while (TelnetClient.available()) {
             TelnetClient.read();
@@ -431,7 +431,7 @@ void RemoteDebug::handle() {
         uint32_t maxTime = MAX_TIME_INACTIVE;  // Normal
 
         if (_password != "" && !_passwordOk) {  // Request password - 18/08/08
-            maxTime = 60000;                    // One minute to password
+            maxTime = PASSWORD_TIMEOUT_MS;      // Timeout for password entry
         } else
             maxTime = connectionTimeout;  // When password is ok set normal timeout
 
@@ -708,7 +708,7 @@ size_t RemoteDebug::write(uint8_t character) {
 
             if (_callbackDbgEnabled && _callbackDbgEnabled()) {  // Callbacks ok
 
-                if (connected && _callbackDbgEnabled()) {  // Only call if is connected and debugger is enabled
+                if (connected && _callbackDbgEnabled()) {  // Only call if connected and debugger is enabled
                     // Call the handle
                     _callbackDbgHandle(false);
                 }
@@ -784,17 +784,17 @@ size_t RemoteDebug::write(uint8_t character) {
                     show.concat(" ");
                 }
                 if (_showColors) {
-                    if (elapsed < 250) {
+                    if (elapsed < PROFILER_THRESHOLD_GREEN_MS) {
                         ;  // not color this
-                    } else if (elapsed < 1000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_YELLOW_MS) {
                         show.concat(COLOR_BLACK);
                         show.concat(COLOR_BACKGROUND_GREEN);
                         resetColors = true;
-                    } else if (elapsed < 3000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_MAGENTA_MS) {
                         show.concat(COLOR_BLACK);
                         show.concat(COLOR_BACKGROUND_YELLOW);
                         resetColors = true;
-                    } else if (elapsed < 5000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_RED_MS) {
                         show.concat(COLOR_WHITE);
                         show.concat(COLOR_BACKGROUND_MAGENTA);
                         resetColors = true;
@@ -1060,11 +1060,11 @@ void RemoteDebug::clearLastCommand() {
 void RemoteDebug::processCommand() {
     static uint32_t lastTime = 0;
 
-    // Bug -> sometimes the command is process twice
+    // Bug -> sometimes the command is processed twice
     // Workaround -> check time
     // TODO: see correction for this
 
-    if (lastTime > 0 && (millis() - lastTime) < 500) {
+    if (lastTime > 0 && (millis() - lastTime) < COMMAND_REPEAT_FILTER_MS) {
         debugPrintln("* Bug workaround: ignoring command repeating");
         return;
     }
@@ -1280,7 +1280,7 @@ void RemoteDebug::processCommand() {
             _showProfiler = true;
         }
 
-        _levelProfilerDisable = 1000;  // Default
+        _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Default
 
         if (options.length() > 0) {  // With time of disable
             int32_t aux = options.toInt();
@@ -1294,7 +1294,7 @@ void RemoteDebug::processCommand() {
     } else if (_command == "A") {
         // Auto debug level profile
 
-        _autoLevelProfiler = 1000;  // Default
+        _autoLevelProfiler = AUTO_PROFILER_DEFAULT_MS;  // Default
 
         if (options.length() > 0) {  // With time of disable
             int32_t aux = options.toInt();
@@ -1334,7 +1334,7 @@ void RemoteDebug::processCommand() {
         DebugWS.stop();
 #endif
 
-        delay(500);
+        delay(RESET_DELAY_MS);
 
         // Reset
 
@@ -1582,7 +1582,7 @@ void RemoteDebug::sendTelnetCommand(uint8_t command, uint8_t option) {
 
 #else                     // DEBUG_DISABLED
 
-/////// All debug is disabled, this include is to define empty debug macros
+/////// All debug is disabled; this include defines empty debug macros
 #include "RemoteDebug.h"  // This library
 
 #endif  // DEBUG_DISABLED

@@ -1,0 +1,118 @@
+name: PlatformIO CI
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  # Check that library metadata is consistent
+  check-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          # Extract versions from all three sources
+          CFG_VER=$(grep '^#define VERSION' src/RemoteDebugCfg.h | sed 's/.*"\(.*\)".*/\1/')
+          JSON_VER=$(grep '"version"' library.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+          PROP_VER=$(grep '^version=' library.properties | cut -d= -f2)
+          
+          echo "src/RemoteDebugCfg.h version: $CFG_VER"
+          echo "library.json version: $JSON_VER"
+          echo "library.properties version: $PROP_VER"
+          
+          # Check all versions match (RemoteDebugCfg.h is the source of truth)
+          if [ "$CFG_VER" != "$JSON_VER" ] || [ "$CFG_VER" != "$PROP_VER" ]; then
+            echo "::error::Version mismatch! All files must match src/RemoteDebugCfg.h ($CFG_VER)"
+            echo "Run: ./development/sync_version.sh"
+            exit 1
+          fi
+          echo "✅ All versions match: $CFG_VER"
+
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - d1_mini        # ESP8266
+          - build-esp32    # ESP32
+          - lolin_d32_pro  # ESP32 Lolin D32 Pro
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: ${{ runner.os }}-pio-${{ matrix.environment }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.environment }}-
+            ${{ runner.os }}-pio-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio intelhex
+
+      - name: Build
+        run: platformio run --environment ${{ matrix.environment }}
+
+  # Build all examples to ensure they compile
+  build-examples:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - examples/Simple
+          - examples/RemoteDebug_Advanced
+          # examples/RemoteDebug_Debugger requires external RemoteDebugger library
+        environment:
+          - d1_mini
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: ${{ runner.os }}-pio-examples-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-examples-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio intelhex
+
+      - name: Build example
+        run: |
+          platformio run --environment ${{ matrix.environment }}
+        env:
+          PLATFORMIO_SRC_DIR: ${{ matrix.example }}

@@ -7,7 +7,7 @@
 /////// Includes
 #include "RemoteDebugWS.h"
 
-// Only if  (RemoteDebugApp) is enabled
+// Only if (RemoteDebugApp) is enabled
 #if not WEBSOCKET_DISABLED
 
 #include <WebSockets.h>  // https://github.com/Links2004/arduinoWebSockets
@@ -20,7 +20,7 @@
 // Version
 #define REMOTEDEBUGWS_VERSION "0.1.1"
 
-// Internal debug macro - recommended stay disable
+// Internal debug macro - recommended to stay disabled
 #define D(fmt, ...)
 // use the following line to enable debug
 // #define D(fmt, ...) Serial.printf("rdws: " fmt "\n", ##__VA_ARGS__);  // Serial debug

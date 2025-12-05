@@ -5,7 +5,8 @@
  * */
 
 #ifndef TELNET_H
-#define TELNET_TELNET_H
+#define TELNET_H
+#pragma once
 
 #define TELNET_IAC   255
 #define TELNET_DONT  254

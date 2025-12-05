@@ -68,7 +68,7 @@
 #define COLOR_BACKGROUND_WHITE "\x1B[47m"
 
 // New system of Colors
-// Note: this colors is not equals to SerialDebug colors, due using standard 16 colors of Ansi, for compatibility
+// Note: these colors are not the same as SerialDebug colors, due to using standard 16 ANSI colors for compatibility
 #define COLOR_VERBOSE COLOR_GREEN
 #define COLOR_DEBUG COLOR_LIGHT_GREEN
 // #define COLOR_INFO		COLOR_YELLOW

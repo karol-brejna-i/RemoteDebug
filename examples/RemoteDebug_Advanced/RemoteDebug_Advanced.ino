@@ -67,11 +67,11 @@ WebServer HTTPServer(80);
 
 // Attention: read this, before you change any option
 //
-// If yot changed it and not works, the compiler is using catching old compiled files
-// To workaround this:
-// - If have a clean project option in IDE (as Eclipse/Platformio), do it
-// - or force compiler to compiler all (changing any configuration of board)
-// - or to this change globally in RemoteDebugCfg.h (on library directory)
+// If you changed it and it doesn't work, the compiler may be using cached old compiled files
+// To work around this:
+// - If you have a clean project option in IDE (like Eclipse/PlatformIO), use it
+// - or force the compiler to recompile all (by changing any board configuration)
+// - or make this change globally in RemoteDebugCfg.h (in the library directory)
 // - And upload again
 //
 // thanks to @22MarioZ for added this issue
