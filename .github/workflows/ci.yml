@@ -17,6 +17,7 @@ jobs:
         environment:
           - d1_mini        # ESP8266
           - build-esp32    # ESP32
+          - lolin_d32_pro  # ESP32 Lolin D32 Pro
     
     steps:
       - name: Checkout code
