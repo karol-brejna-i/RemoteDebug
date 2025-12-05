@@ -17,15 +17,22 @@ jobs:
 
       - name: Check version consistency
         run: |
+          # Extract versions from all three sources
+          CFG_VER=$(grep '^#define VERSION' src/RemoteDebugCfg.h | sed 's/.*"\(.*\)".*/\1/')
           JSON_VER=$(grep '"version"' library.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
           PROP_VER=$(grep '^version=' library.properties | cut -d= -f2)
+          
+          echo "src/RemoteDebugCfg.h version: $CFG_VER"
           echo "library.json version: $JSON_VER"
           echo "library.properties version: $PROP_VER"
-          if [ "$JSON_VER" != "$PROP_VER" ]; then
-            echo "::error::Version mismatch between library.json and library.properties"
+          
+          # Check all versions match (RemoteDebugCfg.h is the source of truth)
+          if [ "$CFG_VER" != "$JSON_VER" ] || [ "$CFG_VER" != "$PROP_VER" ]; then
+            echo "::error::Version mismatch! All files must match src/RemoteDebugCfg.h ($CFG_VER)"
+            echo "Run: ./development/sync_version.sh"
             exit 1
           fi
-          echo "✅ Versions match: $JSON_VER"
+          echo "✅ All versions match: $CFG_VER"
 
   build:
     runs-on: ubuntu-latest

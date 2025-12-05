@@ -42,7 +42,7 @@
 ///// Debug disable for compile to production/release
 ///// as nothing of RemotedDebug is compiled, zero overhead :-)
 // #define DEBUG_DISABLED true
-#define VERSION "4.0.3"
+#define VERSION "4.1.0"
 
 // Debug enabled ?
 #ifndef DEBUG_DISABLED
