@@ -73,6 +73,20 @@
 // Can be by project, just define it before include this file
 #define BUFFER_PRINT 150
 
+// Timing constants (in milliseconds)
+#define CONNECTION_BUFFER_CLEAR_DELAY_MS 100   // Delay to clear input buffer on new connection
+#define RESET_DELAY_MS 500                     // Delay before ESP reset to allow message transmission
+#define PASSWORD_TIMEOUT_MS 60000              // Timeout for password entry (1 minute)
+#define COMMAND_REPEAT_FILTER_MS 500           // Time window to filter duplicate commands
+#define PROFILER_DEFAULT_TIMEOUT_MS 1000       // Default timeout for profiler level
+#define AUTO_PROFILER_DEFAULT_MS 1000          // Default threshold for auto profiler
+
+// Profiler color thresholds (in milliseconds)
+#define PROFILER_THRESHOLD_GREEN_MS 250        // Below this: no color
+#define PROFILER_THRESHOLD_YELLOW_MS 1000      // Below this: green background
+#define PROFILER_THRESHOLD_MAGENTA_MS 3000     // Below this: yellow background
+#define PROFILER_THRESHOLD_RED_MS 5000         // Below this: magenta background, above: red
+
 // Should the help text be displayed on connection.
 // Enabled by default, comment to disable
 #define SHOW_HELP true

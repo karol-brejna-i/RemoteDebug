@@ -288,7 +288,7 @@ void RemoteDebug::handle() {
         if (diff >= _autoLevelProfiler) {
             _levelBeforeProfiler = _clientDebugLevel;
             _clientDebugLevel = PROFILER;
-            _levelProfilerDisable = 1000;  // Disable it at 1 sec
+            _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Disable after default timeout
 
             debugPrintf("* Debug level profile active now - time between handels: %u\r\n", diff);
         }
@@ -357,7 +357,7 @@ void RemoteDebug::handle() {
         TelnetClient.flush();           // clear input buffer, else you get strange characters
 
         // Empty buffer
-        delay(100);
+        delay(CONNECTION_BUFFER_CLEAR_DELAY_MS);
 
         while (TelnetClient.available()) {
             TelnetClient.read();
@@ -431,7 +431,7 @@ void RemoteDebug::handle() {
         uint32_t maxTime = MAX_TIME_INACTIVE;  // Normal
 
         if (_password != "" && !_passwordOk) {  // Request password - 18/08/08
-            maxTime = 60000;                    // One minute to password
+            maxTime = PASSWORD_TIMEOUT_MS;      // Timeout for password entry
         } else
             maxTime = connectionTimeout;  // When password is ok set normal timeout
 
@@ -784,17 +784,17 @@ size_t RemoteDebug::write(uint8_t character) {
                     show.concat(" ");
                 }
                 if (_showColors) {
-                    if (elapsed < 250) {
+                    if (elapsed < PROFILER_THRESHOLD_GREEN_MS) {
                         ;  // not color this
-                    } else if (elapsed < 1000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_YELLOW_MS) {
                         show.concat(COLOR_BLACK);
                         show.concat(COLOR_BACKGROUND_GREEN);
                         resetColors = true;
-                    } else if (elapsed < 3000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_MAGENTA_MS) {
                         show.concat(COLOR_BLACK);
                         show.concat(COLOR_BACKGROUND_YELLOW);
                         resetColors = true;
-                    } else if (elapsed < 5000) {
+                    } else if (elapsed < PROFILER_THRESHOLD_RED_MS) {
                         show.concat(COLOR_WHITE);
                         show.concat(COLOR_BACKGROUND_MAGENTA);
                         resetColors = true;
@@ -1064,7 +1064,7 @@ void RemoteDebug::processCommand() {
     // Workaround -> check time
     // TODO: see correction for this
 
-    if (lastTime > 0 && (millis() - lastTime) < 500) {
+    if (lastTime > 0 && (millis() - lastTime) < COMMAND_REPEAT_FILTER_MS) {
         debugPrintln("* Bug workaround: ignoring command repeating");
         return;
     }
@@ -1280,7 +1280,7 @@ void RemoteDebug::processCommand() {
             _showProfiler = true;
         }
 
-        _levelProfilerDisable = 1000;  // Default
+        _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Default
 
         if (options.length() > 0) {  // With time of disable
             int32_t aux = options.toInt();
@@ -1294,7 +1294,7 @@ void RemoteDebug::processCommand() {
     } else if (_command == "A") {
         // Auto debug level profile
 
-        _autoLevelProfiler = 1000;  // Default
+        _autoLevelProfiler = AUTO_PROFILER_DEFAULT_MS;  // Default
 
         if (options.length() > 0) {  // With time of disable
             int32_t aux = options.toInt();
@@ -1334,7 +1334,7 @@ void RemoteDebug::processCommand() {
         DebugWS.stop();
 #endif
 
-        delay(500);
+        delay(RESET_DELAY_MS);
 
         // Reset
 
