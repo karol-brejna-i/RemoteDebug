@@ -578,14 +578,16 @@ Unit tests with mocks can't catch issues that arise from real network interactio
 
 **Completed:**
 - Added `.github/workflows/ci.yml` with GitHub Actions
-- Matrix build for ESP8266 (`d1_mini`) and ESP32 (`build-esp32`)
-- Separate job to build all examples
+- Matrix build for ESP8266 (`d1_mini`) and ESP32 (`build-esp32`, `lolin_d32_pro`)
+- Separate job to build examples (`simple`, `RemoteDebug_Advanced`)
+- `RemoteDebug_Debugger` excluded (requires external `RemoteDebugger` library)
 - PlatformIO caching for faster builds
 - Triggers on push/PR to `master`, `main`, `develop`
+- Manual trigger via `workflow_dispatch`
 
 **Pipeline Jobs:**
-1. **build** - Compiles minimal test for ESP8266 and ESP32
-2. **build-examples** - Compiles all examples (`simple`, `RemoteDebug_Advanced`, `RemoteDebug_Debugger`)
+1. **build** - Compiles minimal `test/build/build_test.ino` for 3 environments
+2. **build-examples** - Compiles `simple` and `RemoteDebug_Advanced` examples
 
 **Priority:** High  
 **Effort:** Medium  
@@ -878,6 +880,13 @@ Many professional ESP32 developers use ESP-IDF directly for better control, smal
 - Fixed `LED_BUILTIN` undefined error for M5Stick-C in examples
 - Removed invalid `native` environment (library requires ESP8266/ESP32)
 - Set `d1_mini` as default environment for fastest builds
+- Added `lolin_d32_pro` environment for ESP32 Lolin D32 Pro board
+
+**Supported Environments:**
+- `d1_mini` - ESP8266 (default, fastest compile)
+- `build-esp32` - Generic ESP32
+- `m5stick-c` - M5Stick-C (ESP32)
+- `lolin_d32_pro` - Lolin D32 Pro (ESP32 with PSRAM)
 
 **Rationale:**
 A working build configuration is essential for development and CI/CD. The minimal build test allows quick verification that the library compiles without running a full example.

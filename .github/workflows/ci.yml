@@ -8,6 +8,25 @@ on:
   workflow_dispatch:  # Allows manual trigger from GitHub UI
 
 jobs:
+  # Check that library metadata is consistent
+  check-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          JSON_VER=$(grep '"version"' library.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+          PROP_VER=$(grep '^version=' library.properties | cut -d= -f2)
+          echo "library.json version: $JSON_VER"
+          echo "library.properties version: $PROP_VER"
+          if [ "$JSON_VER" != "$PROP_VER" ]; then
+            echo "::error::Version mismatch between library.json and library.properties"
+            exit 1
+          fi
+          echo "✅ Versions match: $JSON_VER"
+
   build:
     runs-on: ubuntu-latest
     
@@ -55,7 +74,7 @@ jobs:
       fail-fast: false
       matrix:
         example:
-          - examples/simple
+          - examples/Simple
           - examples/RemoteDebug_Advanced
           # examples/RemoteDebug_Debugger requires external RemoteDebugger library
         environment:
