@@ -86,5 +86,6 @@ jobs:
 
       - name: Build example
         run: |
-          platformio run --environment ${{ matrix.environment }} \
-            --project-option="src_dir=${{ matrix.example }}"
+          platformio run --environment ${{ matrix.environment }}
+        env:
+          PLATFORMIO_SRC_DIR: ${{ matrix.example }}
