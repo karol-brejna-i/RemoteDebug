@@ -16,6 +16,7 @@ This document contains suggestions for functional and quality improvements to th
 6. [Security Improvements](#6-security-improvements)
 7. [Performance Improvements](#7-performance-improvements)
 8. [Compatibility & Portability](#8-compatibility--portability)
+9. [Build & Development](#9-build--development)
 
 ---
 ## Summary
@@ -27,6 +28,7 @@ This document contains suggestions for functional and quality improvements to th
 | Code Quality | [1.3](#13-replace-magic-numbers-with-named-constants) | Replace Magic Numbers with Named Constants | Medium | ✅ Done |
 | Code Quality | [1.4](#14-remove-dead-code-and-alpha_version-blocks) | Remove Dead Code and ALPHA_VERSION Blocks | Medium | Not Started |
 | Code Quality | [1.5](#15-fix-grammar-and-spelling-in-commentsmessages) | Fix Grammar and Spelling in Comments/Messages | Low | Not Started |
+| Code Quality | [1.6](#16-fix-deprecation-warnings) | Fix Deprecation Warnings | Low | Not Started |
 | Architecture | [2.1](#21-separate-connection-handlers-into-dedicated-classes) | Separate Connection Handlers into Dedicated Classes | High | Not Started |
 | Architecture | [2.2](#22-make-remotedebug-singleton-or-remove-global-instance) | Make RemoteDebug Singleton or Remove Global Instance | Medium | Not Started |
 | Architecture | [2.3](#23-event-driven-architecture-for-commands) | Event-Driven Architecture for Commands | Medium | Not Started |
@@ -45,7 +47,7 @@ This document contains suggestions for functional and quality improvements to th
 | Documentation | [4.4](#44-add-troubleshooting-guide) | Add Troubleshooting Guide | Low | Not Started |
 | Testing & CI/CD | [5.1](#51-add-unit-tests) | Add Unit Tests | High | Not Started |
 | Testing & CI/CD | [5.2](#52-add-integration-tests) | Add Integration Tests | Medium | Not Started |
-| Testing & CI/CD | [5.3](#53-set-up-cicd-pipeline) | Set Up CI/CD Pipeline | High | Not Started |
+| Testing & CI/CD | [5.3](#53-set-up-cicd-pipeline) | Set Up CI/CD Pipeline | High | ✅ Done |
 | Testing & CI/CD | [5.4](#54-add-static-analysis) | Add Static Analysis | Medium | Not Started |
 | Testing & CI/CD | [5.5](#55-add-code-coverage-reporting) | Add Code Coverage Reporting | Low | Not Started |
 | Security | [6.1](#61-improve-password-security) | Improve Password Security | High | Not Started |
@@ -60,6 +62,7 @@ This document contains suggestions for functional and quality improvements to th
 | Compatibility | [8.2](#82-update-websockets-dependency) | Update WebSockets Dependency | Medium | Not Started |
 | Compatibility | [8.3](#83-support-arduino-ide-2x-and-platformio-equally) | Support Arduino IDE 2.x and PlatformIO Equally | Medium | Not Started |
 | Compatibility | [8.4](#84-add-esp-idf-native-support) | Add ESP-IDF Native Support | Low | Not Started |
+| Build | [9.1](#91-improve-build-configuration) | Improve Build Configuration | Medium | ✅ Done |
 
 ---
 
@@ -171,6 +174,29 @@ Dead code increases cognitive load, makes the codebase harder to navigate, and c
 
 **Rationale:**
 Professional-quality documentation and messages build user confidence in the library. Spelling errors and grammatical mistakes can make users question the overall quality of the code. Clear, well-written comments also help contributors understand the code and reduce the barrier to entry for new developers.
+
+**Priority:** Low  
+**Effort:** Low
+
+### 1.6 Fix Deprecation Warnings
+
+**Current State:**
+- Code uses deprecated `WiFiServer.available()` method
+- Compiler warnings during build:
+```
+warning: 'WiFiClient WiFiServer::available(uint8_t*)' is deprecated: Renamed to accept().
+```
+
+📍 **Examples:**
+- [src/RemoteDebug.cpp:318](src/RemoteDebug.cpp#L318) - `newClient = TelnetServer.available();`
+- [src/RemoteDebug.cpp:337](src/RemoteDebug.cpp#L337) - `TelnetClient = TelnetServer.available();`
+
+**Proposal:**
+- Replace `TelnetServer.available()` with `TelnetServer.accept()`
+- Test compatibility with older framework versions (may need `#if` guard)
+
+**Rationale:**
+Deprecation warnings indicate APIs that may be removed in future framework versions. Fixing them ensures forward compatibility and produces a clean build without warnings, which helps identify real issues.
 
 **Priority:** Low  
 **Effort:** Low
@@ -548,21 +574,22 @@ Unit tests with mocks can't catch issues that arise from real network interactio
 ### 5.3 Set Up CI/CD Pipeline
 
 **Current State:**
-- No CI/CD
-- Manual building and testing
+- ✅ Resolved - CI/CD pipeline implemented
 
-**Proposal:**
-- Add GitHub Actions workflow for:
-  - Building all examples for ESP8266 and ESP32
-  - Running unit tests
-  - Linting and static analysis
-  - Automated releases
+**Completed:**
+- Added `.github/workflows/ci.yml` with GitHub Actions
+- Matrix build for ESP8266 (`d1_mini`) and ESP32 (`build-esp32`)
+- Separate job to build all examples
+- PlatformIO caching for faster builds
+- Triggers on push/PR to `master`, `main`, `develop`
 
-**Rationale:**
-Manual building and testing is error-prone and time-consuming. CI/CD automates quality checks on every commit and pull request, catches issues early, and ensures that the main branch always contains working code. Automated releases reduce the risk of human error in the publishing process.
+**Pipeline Jobs:**
+1. **build** - Compiles minimal test for ESP8266 and ESP32
+2. **build-examples** - Compiles all examples (`simple`, `RemoteDebug_Advanced`, `RemoteDebug_Debugger`)
 
 **Priority:** High  
-**Effort:** Medium
+**Effort:** Medium  
+**Status:** ✅ Done
 
 ### 5.4 Add Static Analysis
 
@@ -835,6 +862,29 @@ Many professional ESP32 developers use ESP-IDF directly for better control, smal
 
 **Priority:** Low  
 **Effort:** High
+
+---
+
+## 9. Build & Development
+
+### 9.1 Improve Build Configuration
+
+**Current State:**
+- ✅ Resolved - Build configuration was incomplete/broken
+
+**Completed:**
+- Added proper `src_dir` and `lib_extra_dirs` to `platformio.ini`
+- Created minimal `test/build/build_test.ino` for fast build verification
+- Fixed `LED_BUILTIN` undefined error for M5Stick-C in examples
+- Removed invalid `native` environment (library requires ESP8266/ESP32)
+- Set `d1_mini` as default environment for fastest builds
+
+**Rationale:**
+A working build configuration is essential for development and CI/CD. The minimal build test allows quick verification that the library compiles without running a full example.
+
+**Priority:** Medium  
+**Effort:** Low  
+**Status:** ✅ Done
 
 ---
 
