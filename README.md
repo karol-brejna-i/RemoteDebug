@@ -1,6 +1,7 @@
 # RemoteDebug Library
 
 A library for ESP2866 and ESP32 for debuging projects over WiFi.
+[![arduino-library-badge](https://www.ardu-badge.com/badge/RemoteDebug2.svg?)](https://www.ardu-badge.com/RemoteDebug2)
 
 RemoteDebug sets up a TCP/IP server, that you connect to using telnet or websockets (using a dedicated web app).
 
