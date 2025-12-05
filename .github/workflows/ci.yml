@@ -56,7 +56,7 @@ jobs:
         example:
           - examples/simple
           - examples/RemoteDebug_Advanced
-          - examples/RemoteDebug_Debugger
+          # examples/RemoteDebug_Debugger requires external RemoteDebugger library
         environment:
           - d1_mini
     
