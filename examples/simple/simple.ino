@@ -38,6 +38,11 @@
 #include "RemoteDebug.h"
 RemoteDebug Debug;
 
+// Define LED_BUILTIN if not defined (e.g., M5Stick-C uses GPIO 10)
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 10
+#endif
+
 // SSID and password
 const char* ssid = "........";
 const char* password = "........";
