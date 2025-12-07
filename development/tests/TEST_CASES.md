@@ -694,6 +694,13 @@ Use these test cases for:
 ## 6. API Method Tests
 
 > **Regression Coverage**: Tests public API methods of RemoteDebug class.
+>
+> **Automated Tests**: The following are automated via `run_tests.sh` with `TEST_FIRMWARE=1`:
+> - TC-API-006: `getLastCommand()` - via `test_last_cmd` command
+> - TC-API-007: `clearLastCommand()` - via `test_clear_cmd` command
+> - TC-API-008: `setCallBackProjectCmds()` - via `test_callback` command
+> - TC-API-009: `isConnected()` - via `test_connected` command
+> - TC-API-014: `isSilence()` - via `test_silence` command
 
 ### TC-API-001: begin(hostname) ✅ Regression
 | Field | Value |

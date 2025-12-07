@@ -358,7 +358,7 @@ exit $?
 Create a special firmware build for comprehensive testing:
 
 ```cpp
-// test/firmware/test_firmware.ino
+// test/integration/test_firmware.ino
 /**
  * RemoteDebug Test Firmware
  * 
@@ -813,7 +813,7 @@ hardware-tests:
 
 ### Phase 3: Integration Tests (Week 5-6)
 
-- [ ] Create test firmware (`test/firmware/test_firmware.ino`)
+- [ ] Create test firmware (`test/integration/test_firmware.ino`)
 - [ ] Set up Wokwi configuration
 - [ ] Write telnet integration test scripts
 - [ ] Add Wokwi tests to CI pipeline
@@ -835,7 +835,7 @@ hardware-tests:
 |-----------|---------|----------|----------------|
 | **Unit Tests** | Test pure logic in isolation | `test/unit/` | ✅ Every commit |
 | **Integration Tests** | Test network communication | `test/integration/` | ✅ Via Wokwi |
-| **Hardware Tests** | Full end-to-end validation | `test/firmware/` | Optional (self-hosted) |
+| **Hardware Tests** | Full end-to-end validation | `test/integration/` | Optional (self-hosted) |
 
 ### Recommended Starting Point
 

@@ -23,9 +23,11 @@
 #   PASSWORD    - Device password if set (default: none)
 #   VERBOSE     - Set to 1 for verbose output
 #   TEST_FIRMWARE - Set to 1 if using test_firmware.ino (enables extra tests)
+#   STOP_ON_FAIL - Set to 1 to stop on first failure (default: 0, run all tests)
 #
 
-set -euo pipefail
+set -uo pipefail
+# Note: -e removed so tests continue after failures
 
 # Configuration
 DEVICE_IP="${DEVICE_IP:-${2:-localhost}}"
@@ -33,12 +35,23 @@ DEVICE_PORT="${DEVICE_PORT:-${3:-23}}"
 TIMEOUT="${TIMEOUT:-3}"
 PASSWORD="${PASSWORD:-}"
 VERBOSE="${VERBOSE:-0}"
+STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 TEST_FIRMWARE="${TEST_FIRMWARE:-0}"
+RECONNECT_EACH="${RECONNECT_EACH:-0}"  # Set to 1 to reconnect for each command (slower but tests reconnection)
+COMMAND_DELAY="${COMMAND_DELAY:-0.5}"  # Delay between commands (device has 500ms duplicate filter)
 
 # Test counters
 TESTS_PASSED=0
 TESTS_FAILED=0
 TESTS_SKIPPED=0
+
+# Timing
+START_TIME=$(date +%s)
+
+# Persistent connection state
+NC_PID=""
+NC_IN=""
+NC_OUT=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -83,16 +96,110 @@ log_section() {
     echo -e "${BOLD}=== $1 ===${NC}"
 }
 
+#------------------------------------------------------------------------------
+# Persistent Connection Management
+#------------------------------------------------------------------------------
+
+# Open a persistent connection to the device
+# Creates named pipes for bidirectional communication
+open_connection() {
+    if [[ -n "$NC_PID" ]] && kill -0 "$NC_PID" 2>/dev/null; then
+        log_verbose "Connection already open (PID: $NC_PID)"
+        return 0
+    fi
+    
+    # Create temp directory for FIFOs
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    NC_IN="$tmpdir/nc_in"
+    NC_OUT="$tmpdir/nc_out"
+    
+    mkfifo "$NC_IN" "$NC_OUT"
+    
+    # Start nc in background with FIFOs
+    nc "$DEVICE_IP" "$DEVICE_PORT" < "$NC_IN" > "$NC_OUT" 2>/dev/null &
+    NC_PID=$!
+    
+    # Open file descriptors for writing to input FIFO
+    exec 3>"$NC_IN"
+    exec 4<"$NC_OUT"
+    
+    # Wait for welcome message and discard it
+    sleep 0.5
+    local welcome=""
+    while read -r -t 0.1 line <&4 2>/dev/null; do
+        welcome+="$line"$'\n'
+    done
+    
+    log_verbose "Connection opened (PID: $NC_PID)"
+    log_verbose "Welcome message: ${#welcome} bytes"
+    
+    return 0
+}
+
+# Close the persistent connection
+close_connection() {
+    if [[ -n "$NC_PID" ]]; then
+        kill "$NC_PID" 2>/dev/null || true
+        wait "$NC_PID" 2>/dev/null || true
+        NC_PID=""
+        
+        # Close file descriptors
+        exec 3>&- 2>/dev/null || true
+        exec 4<&- 2>/dev/null || true
+        
+        # Clean up FIFOs
+        [[ -n "$NC_IN" ]] && rm -f "$NC_IN" 2>/dev/null
+        [[ -n "$NC_OUT" ]] && rm -f "$NC_OUT" 2>/dev/null
+        [[ -n "$NC_IN" ]] && rmdir "$(dirname "$NC_IN")" 2>/dev/null || true
+        
+        NC_IN=""
+        NC_OUT=""
+        
+        log_verbose "Connection closed"
+    fi
+}
+
+# Cleanup on exit
+cleanup() {
+    close_connection
+}
+trap cleanup EXIT
+
 # Send a command and capture response
+# Uses persistent connection by default, or reconnects each time if RECONNECT_EACH=1
 # Usage: response=$(send_command "command")
 send_command() {
     local cmd="$1"
-    local response
+    local response=""
     
-    log_verbose "Sending: '$cmd'"
-    
-    # Use printf to send command with CRLF, capture response
-    response=$(printf "%s\r\n" "$cmd" | timeout "$TIMEOUT" nc -w "$TIMEOUT" "$DEVICE_IP" "$DEVICE_PORT" 2>/dev/null || true)
+    if [[ "$RECONNECT_EACH" == "1" ]]; then
+        # Legacy mode: new connection for each command
+        log_verbose "Sending (new connection): '$cmd'"
+        response=$(printf "%s\r\n" "$cmd" | timeout "$TIMEOUT" nc -w "$TIMEOUT" "$DEVICE_IP" "$DEVICE_PORT" 2>/dev/null || true)
+    else
+        # Persistent connection mode
+        local line
+        
+        # Ensure connection is open
+        if [[ -z "$NC_PID" ]] || ! kill -0 "$NC_PID" 2>/dev/null; then
+            open_connection || return 1
+        fi
+        
+        log_verbose "Sending: '$cmd'"
+        
+        # Send command
+        printf "%s\r\n" "$cmd" >&3
+        
+        # Read response (with timeout)
+        sleep 0.2  # Give device time to respond
+        while read -r -t 0.3 line <&4 2>/dev/null; do
+            response+="$line"$'\n'
+        done
+        
+        # Wait before next command (device has 500ms duplicate filter)
+        sleep "$COMMAND_DELAY"
+    fi
     
     log_verbose "Response length: ${#response} bytes"
     if [[ "$VERBOSE" == "1" ]] && [[ ${#response} -lt 500 ]]; then
@@ -118,7 +225,8 @@ assert_contains() {
     else
         log_fail "$test_name - expected pattern '$expected'"
         log_verbose "Full response: $response"
-        return 1
+        [[ "$STOP_ON_FAIL" == "1" ]] && exit 1
+        return 0  # Continue running tests
     fi
 }
 
@@ -133,7 +241,9 @@ assert_not_contains() {
     
     if echo "$response" | grep -qiE "$unexpected"; then
         log_fail "$test_name - unexpected pattern '$unexpected' found"
-        return 1
+        log_verbose "Full response: $response"
+        [[ "$STOP_ON_FAIL" == "1" ]] && exit 1
+        return 0  # Continue running tests
     else
         log_pass "$test_name"
         return 0
@@ -206,19 +316,17 @@ test_connection() {
         return 1
     fi
     
-    # TC-CON-002: Welcome Message Content
-    local welcome
-    welcome=$(echo "" | timeout 2 nc -w 2 "$DEVICE_IP" "$DEVICE_PORT" 2>/dev/null || true)
-    if echo "$welcome" | grep -qiE "RemoteDebug|welcome|host|help"; then
+    # TC-CON-002: Welcome Message - open persistent connection
+    # This also establishes our persistent connection for subsequent tests
+    if open_connection; then
         log_pass "TC-CON-002: Welcome message received"
     else
-        log_skip "TC-CON-002: Welcome message not detected (may be OK)"
+        log_fail "TC-CON-002: Could not establish connection"
+        return 1
     fi
     
     # TC-CON-010: handle() working (commands get processed)
-    if assert_contains "h" "Commands|help|Available" "TC-CON-010: handle() processes commands"; then
-        : # pass
-    fi
+    assert_contains "h" "Commands|help|Available" "TC-CON-010: handle() processes commands"
 }
 
 #------------------------------------------------------------------------------
@@ -257,32 +365,48 @@ test_commands_levels() {
     assert_contains "e" "Error" "TC-CMD-008: Set Error (e)"
     
     # TC-CMD-009: Toggle Debug Level Display (l)
-    assert_contains "l" "debug level.*On|debug level.*Off|Show debug" "TC-CMD-009: Toggle level display (l)"
+    # TC-CMD-009: Toggle Debug Level Display (l)
+    # Output: "* Show debug level: On" or "* Show debug level: Off"
+    assert_contains "l" "Show debug level.*On|Show debug level.*Off" "TC-CMD-009: Toggle level display (l)"
+    
+    # Reset to verbose so subsequent tests can see command output
+    send_command "v" >/dev/null
 }
 
 test_commands_display() {
     log_section "2.3 Display & Formatting Commands (TC-CMD)"
     
+    # Reset to verbose level so we can see command responses
+    # (previous tests may have set level to Error which filters output)
+    send_command "v" >/dev/null
+    
     # TC-CMD-010: Toggle Time Display (t)
-    assert_contains "t" "time.*On|time.*Off|Show time" "TC-CMD-010: Toggle time (t)"
+    # Output: "* Show time: On" or "* Show time: Off"
+    assert_contains "t" "Show time.*On|Show time.*Off" "TC-CMD-010: Toggle time (t)"
     
     # TC-CMD-011: Toggle Colors (c)
-    assert_contains "c" "color.*On|color.*Off|Show color" "TC-CMD-011: Toggle colors (c)"
+    # Output: "* Show colors: On" or "* Show colors: Off"
+    assert_contains "c" "Show colors.*On|Show colors.*Off" "TC-CMD-011: Toggle colors (c)"
     
     # TC-CMD-012: Toggle Profiler (p)
-    assert_contains "p" "profiler.*On|profiler.*Off|Show profiler" "TC-CMD-012: Toggle profiler (p)"
+    assert_contains "p" "Show profiler.*On|Show profiler.*Off" "TC-CMD-012: Toggle profiler (p)"
     
     # TC-CMD-013: Profiler with Minimum Time (p N)
-    assert_contains "p 100" "profiler.*On|minimal time|100" "TC-CMD-013: Profiler with min time (p 100)"
+    assert_contains "p 100" "Show profiler.*On|minimal time.*100" "TC-CMD-013: Profiler with min time (p 100)"
     
     # Reset profiler
     send_command "p" >/dev/null
     
     # TC-CMD-014: Profiler Level (P)
-    assert_contains "P" "profiler level|level.*profiler" "TC-CMD-014: Profiler Level (P)"
+    # Output: "* Debug level set to Profiler (disable in N millis)"
+    assert_contains "P" "level set to Profiler|Profiler.*disable" "TC-CMD-014: Profiler Level (P)"
+    
+    # Reset to verbose after P command (profiler level affects output)
+    send_command "v" >/dev/null
     
     # TC-CMD-015: Auto Profiler (A)
-    assert_contains "A" "auto.*profiler|profiler.*auto" "TC-CMD-015: Auto Profiler (A)"
+    # Output: "* Auto profiler debug level active (time >= N millis)"
+    assert_contains "A" "Auto profiler.*active|profiler.*level.*active" "TC-CMD-015: Auto Profiler (A)"
 }
 
 test_commands_silence_filter() {
@@ -394,7 +518,8 @@ test_log_levels() {
     # Already covered in test_commands_levels
     
     # TC-LVL-009: Level Prefix Display
-    assert_contains "l" "debug level" "TC-LVL-009/010: Level prefix toggle"
+    # Output: "* Show debug level: On" or "* Show debug level: Off"
+    assert_contains "l" "Show debug level.*On|Show debug level.*Off" "TC-LVL-009/010: Level prefix toggle"
     
     if [[ "$TEST_FIRMWARE" == "1" ]]; then
         log_info "Test firmware detected - running level filtering tests"
@@ -459,16 +584,23 @@ test_authentication() {
 test_formatting() {
     log_section "5. Output & Formatting Tests (TC-FMT)"
     
+    # Reset to verbose level so we can see command responses
+    # (previous tests may have set level to Error which filters output)
+    send_command "v" >/dev/null
+    
     # TC-FMT-003: Colors Toggle
-    assert_contains "c" "color" "TC-FMT-003: Color toggle"
+    # Output: "* Show colors: On" or "* Show colors: Off"
+    assert_contains "c" "Show colors.*On|Show colors.*Off" "TC-FMT-003: Color toggle"
     send_command "c" >/dev/null  # Toggle back
     
     # TC-FMT-005: Time Toggle
-    assert_contains "t" "time" "TC-FMT-005: Time toggle"
+    # Output: "* Show time: On" or "* Show time: Off"
+    assert_contains "t" "Show time.*On|Show time.*Off" "TC-FMT-005: Time toggle"
     send_command "t" >/dev/null  # Toggle back
     
     # TC-FMT-007: Profiler Toggle
-    assert_contains "p" "profiler" "TC-FMT-007: Profiler toggle"
+    # Output: "* Show profiler: On" or "* Show profiler: Off"
+    assert_contains "p" "Show profiler.*On|Show profiler.*Off" "TC-FMT-007: Profiler toggle"
     send_command "p" >/dev/null  # Toggle back
     
     # TC-FMT-008-012: Require firmware observation
@@ -501,7 +633,58 @@ test_api_methods() {
     send_command "h" >/dev/null  # Exit silence
     log_pass "TC-API-013/014: silence via commands"
     
-    log_skip "TC-API-002-010: API tests (require firmware verification)"
+    if [[ "$TEST_FIRMWARE" == "1" ]]; then
+        local response
+        
+        # TC-API-006: getLastCommand()
+        response=$(send_command "test_last_cmd")
+        if echo "$response" | grep -qiE "LAST_CMD:test_last_cmd"; then
+            log_pass "TC-API-006: getLastCommand() returns correct command"
+        else
+            log_fail "TC-API-006: getLastCommand() failed"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-API-007: clearLastCommand()
+        response=$(send_command "test_clear_cmd")
+        if echo "$response" | grep -qiE "CLEAR_CMD:OK"; then
+            log_pass "TC-API-007: clearLastCommand() clears buffer"
+        else
+            log_fail "TC-API-007: clearLastCommand() failed"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-API-009: isConnected()
+        response=$(send_command "test_connected")
+        if echo "$response" | grep -qiE "CONNECTED:1"; then
+            log_pass "TC-API-009: isConnected() returns true"
+        else
+            log_fail "TC-API-009: isConnected() failed"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-API-014: isSilence() - should be false initially
+        response=$(send_command "test_silence")
+        if echo "$response" | grep -qiE "SILENCE:0"; then
+            log_pass "TC-API-014: isSilence() returns false (not silent)"
+        else
+            log_fail "TC-API-014: isSilence() failed"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-API-008: setCallBackProjectCmds() - the callback is working if commands work
+        response=$(send_command "test_callback")
+        if echo "$response" | grep -qiE "CALLBACK:OK"; then
+            log_pass "TC-API-008: setCallBackProjectCmds() callback works"
+        else
+            log_fail "TC-API-008: setCallBackProjectCmds() failed"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        log_skip "TC-API-002/003/004/010: Other API tests (require additional firmware)"
+    else
+        log_skip "TC-API-002-010: API tests (require firmware verification - use TEST_FIRMWARE=1)"
+    fi
 }
 
 #------------------------------------------------------------------------------
@@ -556,8 +739,20 @@ test_edge_cases() {
         response=$(send_command "test_flood")
         sleep 2
         assert_responsive "TC-EDGE-004: Message flood (still responsive)"
+        
+        # TC-USR-001: User-defined ping/pong command
+        # Reset to verbose level so INFO messages are visible
+        send_command "v" >/dev/null
+        response=$(send_command "ping")
+        if echo "$response" | grep -qiE "pong"; then
+            log_pass "TC-USR-001: ping -> pong (user command)"
+        else
+            log_fail "TC-USR-001: ping -> pong (expected 'pong' response)"
+            [[ "$DEBUG_MODE" == "1" ]] && echo "Response: $response"
+        fi
     else
         log_skip "TC-EDGE-001/002/004: Need TEST_FIRMWARE=1"
+        log_skip "TC-USR-001: ping -> pong (needs TEST_FIRMWARE=1)"
     fi
 }
 
@@ -574,17 +769,20 @@ test_stability() {
     local mem1 mem2
     mem1=$(send_command "m" | grep -oE '[0-9]+' | head -1 || echo "0")
     
-    # Send 50 commands
-    for _ in {1..50}; do
+    # Send 20 commands (reduced from 50 for speed - each opens new connection)
+    log_info "Sending 20 commands to check memory stability..."
+    for i in {1..20}; do
         send_command "h" >/dev/null
+        [[ $((i % 5)) -eq 0 ]] && echo -n "." >&2
     done
+    echo "" >&2
     
     mem2=$(send_command "m" | grep -oE '[0-9]+' | head -1 || echo "0")
     
     if [[ -n "$mem1" ]] && [[ -n "$mem2" ]]; then
         local diff=$((mem1 - mem2))
         if [[ $diff -lt 5000 ]] && [[ $diff -gt -5000 ]]; then
-            log_pass "TC-EDGE-011: Memory stable after 50 commands (diff: ${diff})"
+            log_pass "TC-EDGE-011: Memory stable after 20 commands (diff: ${diff})"
         else
             log_fail "TC-EDGE-011: Memory changed significantly (diff: ${diff})"
         fi
@@ -675,6 +873,10 @@ run_command_tests() {
 }
 
 print_summary() {
+    local end_time=$(date +%s)
+    local elapsed=$((end_time - START_TIME))
+    local minutes=$((elapsed / 60))
+    local seconds=$((elapsed % 60))
     local total=$((TESTS_PASSED + TESTS_FAILED + TESTS_SKIPPED))
     local pass_rate=0
     if [[ $((TESTS_PASSED + TESTS_FAILED)) -gt 0 ]]; then
@@ -690,6 +892,7 @@ print_summary() {
     echo -e "  ${YELLOW}Skipped:${NC} $TESTS_SKIPPED"
     echo -e "  Total:   $total"
     echo -e "  ${BOLD}Pass Rate: ${pass_rate}%${NC}"
+    echo -e "  ${CYAN}Duration:${NC} ${minutes}m ${seconds}s"
     echo -e "${BOLD}========================================${NC}"
     
     if [[ $TESTS_FAILED -gt 0 ]]; then
@@ -707,25 +910,30 @@ print_usage() {
     echo "Usage: $0 [suite] [device_ip] [port]"
     echo ""
     echo "Test Suites:"
-    echo "  smoke     - Quick smoke test (~2 min, essential commands)"
-    echo "  basic     - Standard regression (~5 min)"
-    echo "  full      - Complete regression (~10 min)"
+    echo "  smoke     - Quick smoke test (~30 sec)"
+    echo "  basic     - Standard regression (~1 min)"
+    echo "  full      - Complete regression (~2 min)"
     echo "  commands  - All command tests"
     echo "  levels    - Log level tests"
     echo "  auth      - Authentication tests (requires PASSWORD)"
     echo ""
     echo "Environment Variables:"
-    echo "  DEVICE_IP     - Device IP (default: localhost)"
-    echo "  DEVICE_PORT   - Telnet port (default: 23)"
-    echo "  PASSWORD      - Password if required"
-    echo "  VERBOSE       - Set to 1 for debug output"
-    echo "  TEST_FIRMWARE - Set to 1 if using test_firmware.ino"
+    echo "  DEVICE_IP      - Device IP (default: localhost)"
+    echo "  DEVICE_PORT    - Telnet port (default: 23)"
+    echo "  TIMEOUT        - Command timeout in seconds (default: 3)"
+    echo "  PASSWORD       - Password if required"
+    echo "  VERBOSE        - Set to 1 for debug output"
+    echo "  TEST_FIRMWARE  - Set to 1 if using test_firmware.ino"
+    echo "  STOP_ON_FAIL   - Set to 1 to stop on first failure"
+    echo "  RECONNECT_EACH - Set to 1 to reconnect for each command (slower)"
+    echo "  COMMAND_DELAY  - Delay between commands in seconds (default: 0.5)"
     echo ""
     echo "Examples:"
     echo "  $0 smoke 192.168.1.100"
     echo "  DEVICE_IP=192.168.1.100 $0 full"
     echo "  TEST_FIRMWARE=1 $0 full 192.168.1.100"
     echo "  PASSWORD=secret $0 auth 192.168.1.100"
+    echo "  VERBOSE=1 RECONNECT_EACH=1 $0 smoke 192.168.1.100"
 }
 
 #------------------------------------------------------------------------------

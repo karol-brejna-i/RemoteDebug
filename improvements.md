@@ -553,7 +553,7 @@ Users encountering problems often search for solutions before opening issues. A 
 > - [TESTING_STRATEGY.md](development/TESTING_STRATEGY.md) - Comprehensive testing strategy
 > - [TEST_CASES.md](development/TEST_CASES.md) - Specific test cases with expected results
 > - [test/integration/run_tests.sh](test/integration/run_tests.sh) - Automated integration test script
-> - [test/firmware/test_firmware.ino](test/firmware/test_firmware.ino) - Dedicated test firmware
+> - [test/integration/test_firmware.ino](test/integration/test_firmware.ino) - Dedicated test firmware
 
 ### 5.1 Add Unit Tests
 
@@ -586,7 +586,7 @@ Without tests, every change to the codebase is a leap of faith. Bugs can be intr
 - No automated integration testing
 - ✅ Test infrastructure created:
   - `test/integration/run_tests.sh` - Automated telnet test script
-  - `test/firmware/test_firmware.ino` - Dedicated test firmware
+  - `test/integration/test_firmware.ino` - Dedicated test firmware
   - `development/TEST_CASES.md` - 60+ documented test cases
 
 **Proposal:**

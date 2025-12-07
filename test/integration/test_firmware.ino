@@ -29,13 +29,38 @@
 // Configuration
 //------------------------------------------------------------------------------
 
-// WiFi credentials - UPDATE THESE
-#define WIFI_SSID     "YOUR_SSID"
-#define WIFI_PASSWORD "YOUR_PASSWORD"
+// WiFi credentials - passed via build flags from environment variables
+// Usage: WIFI_SSID="YourSSID" WIFI_PASSWORD="YourPass" pio run -e integration_test -t upload
+// For local development, you can also create a .env file or set them in your shell
+#ifndef WIFI_SSID
+    #define WIFI_SSID "YOUR_SSID"  // Fallback - replace or set env var
+#endif
+#ifndef WIFI_PASSWORD
+    #define WIFI_PASSWORD "YOUR_PASSWORD"  // Fallback - replace or set env var
+#endif
 
 // Device configuration
 #define HOSTNAME "remotedebug-test"
 #define TELNET_PORT 23
+
+// LED configuration - uses built-in LED for status indication
+// Status patterns:
+//   Fast blink (100ms) = Connecting to WiFi
+//   Slow blink (1000ms) = WiFi connection failed
+//   Solid ON = Connected and running
+//   Brief OFF pulse = Heartbeat (when connected)
+#if defined(ESP8266)
+    #define LED_BUILTIN_PIN LED_BUILTIN  // Usually GPIO2
+    #define LED_ON  LOW   // ESP8266 built-in LED is active LOW
+    #define LED_OFF HIGH
+#elif defined(ESP32)
+    #ifndef LED_BUILTIN
+        #define LED_BUILTIN 2  // Common ESP32 LED pin
+    #endif
+    #define LED_BUILTIN_PIN LED_BUILTIN
+    #define LED_ON  HIGH  // Most ESP32 LEDs are active HIGH
+    #define LED_OFF LOW
+#endif
 
 // Test configuration
 #define HEARTBEAT_INTERVAL_MS 5000      // Send heartbeat every 5 seconds
@@ -70,6 +95,56 @@ RemoteDebug Debug;
 uint32_t testCounter = 0;
 uint32_t lastHeartbeat = 0;
 uint32_t bootTime = 0;
+uint32_t lastLedToggle = 0;
+bool ledState = false;
+bool wasConnected = false;  // Track connection state changes
+
+//------------------------------------------------------------------------------
+// LED Status Functions
+//------------------------------------------------------------------------------
+
+void setupLed() {
+    pinMode(LED_BUILTIN_PIN, OUTPUT);
+    digitalWrite(LED_BUILTIN_PIN, LED_OFF);
+}
+
+void ledOn() {
+    digitalWrite(LED_BUILTIN_PIN, LED_ON);
+    ledState = true;
+}
+
+void ledOff() {
+    digitalWrite(LED_BUILTIN_PIN, LED_OFF);
+    ledState = false;
+}
+
+void ledToggle() {
+    ledState = !ledState;
+    digitalWrite(LED_BUILTIN_PIN, ledState ? LED_ON : LED_OFF);
+}
+
+// Fast blink pattern for "connecting to WiFi"
+void ledBlinkConnecting() {
+    if (millis() - lastLedToggle >= 100) {
+        ledToggle();
+        lastLedToggle = millis();
+    }
+}
+
+// Slow blink pattern for "connection failed"
+void ledBlinkFailed() {
+    if (millis() - lastLedToggle >= 1000) {
+        ledToggle();
+        lastLedToggle = millis();
+    }
+}
+
+// Brief OFF pulse for heartbeat indication
+void ledHeartbeatPulse() {
+    ledOff();
+    delay(50);
+    ledOn();
+}
 
 //------------------------------------------------------------------------------
 // Test Commands Implementation
@@ -190,31 +265,81 @@ void processTestCommands() {
     
     // Process test commands
     if (command == "test_all_levels") {
+        Serial.println("[CMD] test_all_levels");
         cmdTestAllLevels();
         Debug.clearLastCommand();
     }
     else if (command == "test_flood") {
+        Serial.println("[CMD] test_flood");
         cmdTestFlood();
         Debug.clearLastCommand();
     }
     else if (command == "test_long") {
+        Serial.println("[CMD] test_long");
         cmdTestLongMessage();
         Debug.clearLastCommand();
     }
     else if (command == "test_special") {
+        Serial.println("[CMD] test_special");
         cmdTestSpecialChars();
         Debug.clearLastCommand();
     }
     else if (command == "test_status") {
+        Serial.println("[CMD] test_status");
         cmdTestStatus();
         Debug.clearLastCommand();
     }
     else if (command == "test_colors") {
+        Serial.println("[CMD] test_colors");
         cmdTestColors();
         Debug.clearLastCommand();
     }
     else if (command == "test_echo") {
+        Serial.print("[CMD] test_echo: ");
+        Serial.println(args);
         cmdTestEcho(args);
+        Debug.clearLastCommand();
+    }
+    else if (command == "ping") {
+        Serial.println("[CMD] ping -> pong");
+        debugI("pong");
+        Debug.clearLastCommand();
+    }
+    // API Test Commands - for verifying RemoteDebug API methods
+    else if (command == "test_last_cmd") {
+        Serial.println("[CMD] test_last_cmd");
+        // Get the last command before this one (we need to save it first)
+        // Note: At this point, getLastCommand() returns "test_last_cmd" itself
+        debugI("LAST_CMD:%s", Debug.getLastCommand().c_str());
+        Debug.clearLastCommand();
+    }
+    else if (command == "test_clear_cmd") {
+        Serial.println("[CMD] test_clear_cmd");
+        // Clear the command buffer and verify it's empty
+        Debug.clearLastCommand();
+        String after = Debug.getLastCommand();
+        if (after.length() == 0) {
+            debugI("CLEAR_CMD:OK");
+        } else {
+            debugI("CLEAR_CMD:FAIL");
+        }
+    }
+    else if (command == "test_connected") {
+        Serial.println("[CMD] test_connected");
+        bool connected = Debug.isConnected();
+        debugI("CONNECTED:%d", connected ? 1 : 0);
+        Debug.clearLastCommand();
+    }
+    else if (command == "test_silence") {
+        Serial.println("[CMD] test_silence");
+        bool silent = Debug.isSilence();
+        debugI("SILENCE:%d", silent ? 1 : 0);
+        Debug.clearLastCommand();
+    }
+    else if (command == "test_callback") {
+        Serial.println("[CMD] test_callback");
+        // The callback is already set up - if we got here, it's working!
+        debugI("CALLBACK:OK");
         Debug.clearLastCommand();
     }
     else if (command == "test_help") {
@@ -226,8 +351,15 @@ void processTestCommands() {
         debugI("test_status     - Show device status");
         debugI("test_colors     - Show colored messages");
         debugI("test_echo <msg> - Echo back the message");
+        debugI("ping            - Respond with pong");
+        debugI("=== API Test Commands ===");
+        debugI("test_last_cmd   - Show last command (API)");
+        debugI("test_clear_cmd  - Clear & verify command");
+        debugI("test_connected  - Check isConnected()");
+        debugI("test_silence    - Check isSilence()");
+        debugI("test_callback   - Verify callback works");
         debugI("test_help       - Show this help");
-        debugI("=====================");
+        debugI("=========================");
         Debug.clearLastCommand();
     }
     // Note: Standard commands (h, v, d, i, w, e, m, etc.) are handled by RemoteDebug
@@ -249,6 +381,9 @@ void sendHeartbeat() {
                (millis() - bootTime) / 1000,
                ESP.getFreeHeap());
         
+        // Brief LED pulse to indicate heartbeat
+        ledHeartbeatPulse();
+        
         lastHeartbeat = millis();
     }
 }
@@ -265,6 +400,7 @@ bool setupWiFi() {
     
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 60) {
+        ledBlinkConnecting();  // Fast blink while connecting
         delay(500);
         Serial.print(".");
         attempts++;
@@ -272,8 +408,14 @@ bool setupWiFi() {
     
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("\n[WiFi] Connection failed!");
+        Serial.print("[WiFi] SSID: ");
+        Serial.println(WIFI_SSID);
+        Serial.print("[WiFi] Password: ");
+        Serial.println(WIFI_PASSWORD);
         return false;
     }
+    
+    ledOn();  // Solid ON when connected
     
     Serial.println();
     Serial.println("[WiFi] Connected!");
@@ -309,6 +451,9 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     
+    // Initialize LED
+    setupLed();
+    
     Serial.println();
     Serial.println("========================================");
     Serial.println("  RemoteDebug Test Firmware v1.0");
@@ -317,8 +462,10 @@ void setup() {
     // Connect to WiFi
     if (!setupWiFi()) {
         Serial.println("[ERROR] Cannot continue without WiFi");
+        // Slow blink to indicate failure
         while (true) {
-            delay(1000);
+            ledBlinkFailed();
+            delay(10);
         }
     }
     
@@ -326,7 +473,7 @@ void setup() {
     setupMDNS();
     
     // Initialize RemoteDebug
-    Debug.begin(HOSTNAME, TELNET_PORT);
+    Debug.begin(HOSTNAME);
     Debug.setResetCmdEnabled(true);
     Debug.showColors(true);
     Debug.showTime(true);
@@ -360,6 +507,16 @@ void setup() {
 void loop() {
     // Handle RemoteDebug
     Debug.handle();
+    
+    // Monitor connection state changes
+    bool isConnected = Debug.isConnected();
+    if (isConnected && !wasConnected) {
+        Serial.println("[Telnet] Client connected");
+        wasConnected = true;
+    } else if (!isConnected && wasConnected) {
+        Serial.println("[Telnet] Client disconnected");
+        wasConnected = false;
+    }
     
     // Process custom test commands
     processTestCommands();
