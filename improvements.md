@@ -549,16 +549,30 @@ Users encountering problems often search for solutions before opening issues. A 
 
 ## 5. Testing & CI/CD
 
+> **📚 Detailed Testing Documentation:**
+> - [TESTING_STRATEGY.md](development/TESTING_STRATEGY.md) - Comprehensive testing strategy
+> - [TEST_CASES.md](development/TEST_CASES.md) - Specific test cases with expected results
+> - [test/integration/run_tests.sh](test/integration/run_tests.sh) - Automated integration test script
+> - [test/firmware/test_firmware.ino](test/firmware/test_firmware.ino) - Dedicated test firmware
+
 ### 5.1 Add Unit Tests
 
 **Current State:**
 - No tests at all
 - Changes risk introducing regressions
+- 🔧 Testing strategy documented in [development/TESTING_STRATEGY.md](development/TESTING_STRATEGY.md)
 
 **Proposal:**
-- Add unit tests using a framework like Unity or GoogleTest
+- Add unit tests using PlatformIO Native + Unity framework
+- Extract testable components: CommandParser, MessageFormatter, InputBuffer
 - Test core functionality: logging, command processing, formatting
 - Mock network components for isolated testing
+
+**Key testable areas identified:**
+- Command parsing and validation
+- Log level filtering logic
+- Message formatting (colors, timestamps, prefixes)
+- Input buffer handling (CR/LF, special characters)
 
 **Rationale:**
 Without tests, every change to the codebase is a leap of faith. Bugs can be introduced silently and may not be discovered until users report them. Unit tests provide confidence that changes don't break existing functionality, enable safe refactoring, and serve as executable documentation of expected behavior.
@@ -570,11 +584,21 @@ Without tests, every change to the codebase is a leap of faith. Bugs can be intr
 
 **Current State:**
 - No automated integration testing
+- ✅ Test infrastructure created:
+  - `test/integration/run_tests.sh` - Automated telnet test script
+  - `test/firmware/test_firmware.ino` - Dedicated test firmware
+  - `development/TEST_CASES.md` - 60+ documented test cases
 
 **Proposal:**
 - Create integration tests that run on actual hardware (or QEMU/Wokwi)
 - Test telnet and websocket connections
 - Automate with HIL (Hardware-in-the-Loop) testing
+
+**Test approach:**
+1. Flash `test_firmware.ino` to ESP32/ESP8266
+2. Run `./test/integration/run_tests.sh <device_ip>` 
+3. Tests send telnet commands and verify responses
+4. Can also run against Wokwi simulator in CI
 
 **Rationale:**
 Unit tests with mocks can't catch issues that arise from real network interactions, timing, or hardware-specific behavior. Integration tests verify that the library works correctly in its actual operating environment. Tools like Wokwi enable running these tests in CI without physical hardware.
