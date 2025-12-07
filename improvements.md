@@ -27,7 +27,7 @@ This document contains suggestions for functional and quality improvements to th
 | Code Quality | [1.2](#12-consistent-naming-conventions) | Consistent Naming Conventions | Low | Not Started |
 | Code Quality | [1.3](#13-replace-magic-numbers-with-named-constants) | Replace Magic Numbers with Named Constants | Medium | ✅ Done |
 | Code Quality | [1.4](#14-remove-dead-code-and-alpha_version-blocks) | Remove Dead Code and ALPHA_VERSION Blocks | Medium | Not Started |
-| Code Quality | [1.5](#15-fix-grammar-and-spelling-in-commentsmessages) | Fix Grammar and Spelling in Comments/Messages | Low | Not Started |
+| Code Quality | [1.5](#15-fix-grammar-and-spelling-in-commentsmessages) | Fix Grammar and Spelling in Comments/Messages | Low | ✅ Done |
 | Code Quality | [1.6](#16-fix-deprecation-warnings) | Fix Deprecation Warnings | Low | Not Started |
 | Architecture | [2.1](#21-separate-connection-handlers-into-dedicated-classes) | Separate Connection Handlers into Dedicated Classes | High | Not Started |
 | Architecture | [2.2](#22-make-remotedebug-singleton-or-remove-global-instance) | Make RemoteDebug Singleton or Remove Global Instance | Medium | Not Started |

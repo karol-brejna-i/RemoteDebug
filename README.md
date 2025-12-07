@@ -1,6 +1,6 @@
 # RemoteDebug Library
 
-A library for ESP2866 and ESP32 for debuging projects over WiFi.
+A library for ESP8266 and ESP32 for debugging projects over WiFi.
 [![arduino-library-badge](https://www.ardu-badge.com/badge/RemoteDebug2.svg?)](https://www.ardu-badge.com/RemoteDebug2)
 
 RemoteDebug sets up a TCP/IP server, that you connect to using telnet or websockets (using a dedicated web app).
@@ -117,7 +117,7 @@ The original functionality is not changed. The following limitations are inherit
 - supports either telnet or websockets, but not both at the same time (implementation choice)
 - websockets logger doesn't send unicode characters (probably implementation problem)
 
-The library has no tests, nor CI/CD.
+The library now has a CI/CD pipeline (GitHub Actions) that builds for ESP8266 and ESP32.
 
 Probably, with time some of these limitations will be removed.
 
@@ -126,4 +126,5 @@ Probably, with time some of these limitations will be removed.
 - Included changes from the following PRs (not included in the original library ATTOW):
   - <https://github.com/JoaoLopesF/RemoteDebug/pull/73>
   - <https://github.com/JoaoLopesF/RemoteDebug/pull/56>
-- MAJOR CHANGE: Removed ArduinoWebsockets from the sources and used the one from the library manager. There is still "a little problem" with <https://github.com/Links2004/arduinoWebSockets> -- it doesn't compile under ESP32 (latest version 2.4.1), so we use the older version 2.3.4. This is a temporary solution, until the problem is fixed.
+- MAJOR CHANGE: Removed ArduinoWebsockets from the sources and used the one from the library manager.
+- Added CI/CD pipeline with GitHub Actions for automated builds on ESP8266 and ESP32.
