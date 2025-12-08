@@ -39,13 +39,13 @@ Use these test cases for:
 | Category | Description | Count | Coverage |
 |----------|-------------|-------|----------|
 | [1. Connection](#1-connection-tests) | TCP/Telnet connection lifecycle | 10 | ✅ Complete |
-| [2. Commands](#2-command-tests) | Every built-in telnet command | 32 | ✅ Complete |
+| [2. Commands](#2-command-tests) | Every built-in telnet command | 36 | ✅ Complete |
 | [3. Log Levels](#3-log-level-tests) | Level filtering & isActive() | 12 | ✅ Complete |
 | [4. Authentication](#4-authentication-tests) | Password protection flow | 8 | ✅ Complete |
 | [5. Output & Formatting](#5-output--formatting-tests) | Colors, time, profiler, serial | 12 | ✅ Complete |
 | [6. API Methods](#6-api-method-tests) | Public API verification | 15 | ✅ Complete |
 | [7. Edge Cases & Stability](#7-edge-cases--stability-tests) | Error handling, limits, memory | 12 | ✅ Complete |
-| **Total Regression Tests** | | **101** | |
+| **Total Regression Tests** | | **105** | |
 
 ### New Feature Tests (Planned Improvements)
 
@@ -170,6 +170,40 @@ Use these test cases for:
 | **Preconditions** | Connected |
 | **Steps** | 1. Send `m` |
 | **Expected Result** | "Free Heap RAM: [number]" displayed |
+
+### 2.1a Project Commands in Help
+
+### TC-CMD-020: Project Commands Section in Help ✅ Regression
+| Field | Value |
+|-------|-------|
+| **Priority** | High |
+| **Preconditions** | Connected, firmware uses `setHelpProjectsCmds()` and `setCallBackProjectCmds()` |
+| **Steps** | 1. Send `h` |
+| **Expected Result** | Help output includes "Project commands:" section |
+
+### TC-CMD-021: Documented Commands Appear in Help ✅ Regression
+| Field | Value |
+|-------|-------|
+| **Priority** | High |
+| **Preconditions** | Connected, firmware has project commands configured |
+| **Steps** | 1. Send `h`<br>2. Check for commands listed via `setHelpProjectsCmds()` |
+| **Expected Result** | All commands provided to `setHelpProjectsCmds()` are visible in help output |
+
+### TC-CMD-022: Hidden Command Not in Help ✅ Regression
+| Field | Value |
+|-------|-------|
+| **Priority** | Medium |
+| **Preconditions** | Connected, firmware has a command NOT listed in `setHelpProjectsCmds()` |
+| **Steps** | 1. Send `h`<br>2. Search for the hidden command name |
+| **Expected Result** | Hidden command does NOT appear in help output |
+
+### TC-CMD-023: Hidden Command Still Executes ✅ Regression
+| Field | Value |
+|-------|-------|
+| **Priority** | Medium |
+| **Preconditions** | Connected, firmware has hidden command implemented in callback |
+| **Steps** | 1. Send the hidden command (e.g., `hidden_cmd`) |
+| **Expected Result** | Command executes successfully despite not being listed in help |
 
 ### 2.2 Debug Level Commands
 
@@ -989,9 +1023,18 @@ Use these test cases for:
 | Test ID | Priority |
 |---------|----------|
 | TC-AUTH-* | High - Add password test mode |
-| TC-CMD-018-020 | High - Filter commands |
-| TC-CMD-021-024 | Medium - Timeout commands |
+| TC-CMD-018-019 | High - Filter commands |
+| TC-CMD-024-027 | Medium - Timeout commands |
 | TC-EDGE-001-006 | Medium - Edge cases |
+
+### Recently Added (Project Commands)
+
+| Test ID | Implemented | Status |
+|---------|-------------|--------|
+| TC-CMD-020 | ✅ | Project commands section in help |
+| TC-CMD-021 | ✅ | Documented commands appear in help |
+| TC-CMD-022 | ✅ | Hidden command not in help |
+| TC-CMD-023 | ✅ | Hidden command still executes |
 
 ---
 
@@ -1004,12 +1047,13 @@ Before ANY code change, run these minimum regression tests:
 - [ ] TC-CMD-001: Help works
 - [ ] TC-CMD-003: Memory command works
 - [ ] TC-CMD-004-008: Level commands work
-- [ ] TC-CMD-025: Quit works
+- [ ] TC-CMD-020-023: Project commands in help (if TEST_FIRMWARE=1)
+- [ ] TC-CMD-028: Quit works
 
 ### Standard Regression (15 min)
 - [ ] All Quick Smoke tests
 - [ ] TC-CMD-010-012: Toggle commands
-- [ ] TC-CMD-018, 020: Filter set/clear
+- [ ] TC-CMD-018-019: Filter set/clear
 - [ ] TC-LVL-001-005: Level filtering
 - [ ] TC-FMT-003, 005, 007: Format toggles
 

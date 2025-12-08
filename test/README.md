@@ -168,6 +168,77 @@ jobs:
 - `WIFI_PASSWORD` - WiFi password  
 - `DEVICE_IP` - IP address of the test device
 
+## WebSocket Testing
+
+RemoteDebug also supports WebSocket connections (port 8232). A separate test script and firmware build are provided for WebSocket testing.
+
+### Requirements
+
+**Different board required:** The Seeed XIAO ESP32-C6 lacks `WiFiClientSecure` support needed for WebSockets. Use a standard ESP32 board (like ESP32 DevKit) for WebSocket testing.
+
+**WebSocket client:** Install one of:
+```bash
+# Option 1: Python websocket-client (recommended, works everywhere)
+pip install websocket-client
+# or with --break-system-packages on newer Ubuntu/Debian:
+pip install --user websocket-client --break-system-packages
+
+# Option 2: websocat binary (download from GitHub)
+# https://github.com/vi/webssocat/releases
+# Download, chmod +x, and place in PATH
+```
+
+### Flash WebSocket-Enabled Firmware
+
+```bash
+# Flash to ESP32 DevKit (not XIAO!)
+WIFI_SSID="YourNetwork" WIFI_PASSWORD="YourPassword" pio run -e integration_test_ws -t upload
+```
+
+### Run WebSocket Tests
+
+```bash
+cd test/integration
+
+# Smoke test
+./run_tests_ws.sh smoke 192.168.1.100
+
+# Full test suite
+./run_tests_ws.sh full 192.168.1.100
+
+# With verbose output
+VERBOSE=1 ./run_tests_ws.sh basic 192.168.1.100
+```
+
+### WebSocket Test Suites
+
+| Suite | Description |
+|-------|-------------|
+| `smoke` | Quick connectivity test |
+| `basic` | Standard command tests |
+| `full` | Complete test suite including firmware commands |
+
+### WebSocket Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEVICE_IP` | (required) | IP address of the device |
+| `DEVICE_PORT` | 8232 | WebSocket port |
+| `TIMEOUT` | 5 | Command timeout in seconds |
+| `VERBOSE` | 0 | Set to 1 for debug output |
+| `TEST_FIRMWARE` | 1 | Extended tests enabled by default |
+| `COMMAND_DELAY` | 0.5 | Delay between commands |
+
+### Telnet vs WebSocket Comparison
+
+| Feature | Telnet | WebSocket |
+|---------|--------|-----------|
+| Port | 23 | 8232 |
+| Test script | `run_tests.sh` | `run_tests_ws.sh` |
+| Build environment | `integration_test` | `integration_test_ws` |
+| Board | Seeed XIAO ESP32-C6 | ESP32 DevKit |
+| Client tool | `nc` (netcat) | `websocat` or Python |
+
 ## Examples
 
 ```bash
@@ -212,8 +283,10 @@ test/
 ├── build/
 │   └── build_test.ino  # Build verification sketch
 └── integration/
-    ├── run_tests.sh       # Integration test script
-    └── test_firmware.ino  # Dedicated test firmware with test commands
+    ├── run_tests.sh       # Telnet integration test script
+    ├── run_tests_ws.sh    # WebSocket integration test script
+    ├── test_firmware.ino  # Dedicated test firmware with test commands
+    └── set_src_dir.py     # PlatformIO helper for test firmware path
 ```
 
 ## Test Firmware
@@ -271,6 +344,12 @@ This firmware adds special test commands:
 - RemoteDebug allows only one client at a time
 - Close any existing telnet sessions
 - Wait a few seconds and retry
+
+### WebSocket connection fails
+- Ensure firmware was built with `integration_test_ws` environment
+- Check port 8232 is not blocked by firewall
+- Verify `websocat` or Python websocket-client is installed
+- Try: `websocat ws://192.168.1.100:8232/`
 
 ## Related Documentation
 

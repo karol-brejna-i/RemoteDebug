@@ -346,6 +346,42 @@ test_commands_help() {
     assert_contains "m" "Free.*Heap|Heap.*RAM|[0-9]+" "TC-CMD-003: Memory (m)"
 }
 
+test_commands_project_help() {
+    log_section "2.1a Project Commands in Help (TC-CMD)"
+    
+    # These tests require test firmware with project commands configured
+    if [[ "$TEST_FIRMWARE" != "1" ]]; then
+        log_skip "TC-CMD-020: Project commands in help (requires TEST_FIRMWARE=1)"
+        log_skip "TC-CMD-021: Hidden command not in help (requires TEST_FIRMWARE=1)"
+        log_skip "TC-CMD-022: Hidden command executes (requires TEST_FIRMWARE=1)"
+        return
+    fi
+    
+    # TC-CMD-020: Project commands section appears in help
+    # When setHelpProjectsCmds() and setCallBackProjectCmds() are both set,
+    # help should show "Project commands:" section with user-defined commands
+    assert_contains "h" "Project commands" "TC-CMD-020: Project commands section in help"
+    
+    # TC-CMD-021: Documented commands appear in help
+    # Commands listed via setHelpProjectsCmds() should be visible
+    assert_contains "h" "test_all_levels" "TC-CMD-021a: test_all_levels in help"
+    assert_contains "h" "ping" "TC-CMD-021b: ping command in help"
+    assert_contains "h" "test_echo" "TC-CMD-021c: test_echo in help"
+    
+    # TC-CMD-022: Hidden command NOT in help but still works
+    # hidden_cmd is intentionally NOT listed in setHelpProjectsCmds()
+    local help_output
+    help_output=$(send_command "h")
+    if echo "$help_output" | grep -qi "hidden_cmd"; then
+        log_fail "TC-CMD-022a: Hidden command should NOT appear in help"
+    else
+        log_pass "TC-CMD-022a: Hidden command correctly NOT in help"
+    fi
+    
+    # TC-CMD-023: Hidden command still executes despite not being in help
+    assert_contains "hidden_cmd" "HIDDEN_CMD_EXECUTED" "TC-CMD-023: Hidden command executes"
+}
+
 test_commands_levels() {
     log_section "2.2 Debug Level Commands (TC-CMD)"
     
@@ -807,6 +843,7 @@ run_smoke_tests() {
     
     # Essential commands only
     test_commands_help
+    test_commands_project_help
     test_commands_levels
 }
 
@@ -821,6 +858,7 @@ run_basic_tests() {
     authenticate || return 1
     
     test_commands_help
+    test_commands_project_help
     test_commands_levels
     test_commands_display
     test_commands_silence_filter
@@ -840,6 +878,7 @@ run_full_tests() {
     authenticate || return 1
     
     test_commands_help
+    test_commands_project_help
     test_commands_levels
     test_commands_display
     test_commands_silence_filter
@@ -864,6 +903,7 @@ run_command_tests() {
     authenticate || return 1
     
     test_commands_help
+    test_commands_project_help
     test_commands_levels
     test_commands_display
     test_commands_silence_filter

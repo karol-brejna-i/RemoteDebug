@@ -41,6 +41,7 @@ This document contains suggestions for functional and quality improvements to th
 | Functional | [3.6](#36-add-file-logging-spiffslittlefs) | Add File Logging (SPIFFS/LittleFS) | Low | Not Started |
 | Functional | [3.7](#37-configurable-port-numbers-at-runtime) | Configurable Port Numbers at Runtime | High | Not Started |
 | Functional | [3.8](#38-add-connection-callback-for-password-verification) | Add Connection Callback for Password Verification | Medium | Not Started |
+| Functional | [3.9](#39-structured-command-registration-api) | Structured Command Registration API | Low | Not Started |
 | Documentation | [4.1](#41-add-api-reference-documentation) | Add API Reference Documentation | High | Not Started |
 | Documentation | [4.2](#42-create-migration-guide) | Create Migration Guide | Medium | Not Started |
 | Documentation | [4.3](#43-improve-example-documentation) | Improve Example Documentation | Medium | Not Started |
@@ -473,6 +474,61 @@ Different deployments have different security requirements. Some might need inte
 
 **Priority:** Medium  
 **Effort:** Low
+
+### 3.9 Structured Command Registration API
+
+**Current State:**
+- Project commands are configured via two separate calls:
+  - `setHelpProjectsCmds(String help)` - sets arbitrary help text
+  - `setCallBackProjectCmds(callback)` - sets a single callback for all commands
+- Help text and command implementation are completely decoupled
+- No validation that help text matches actual implemented commands
+- No built-in support for hidden commands (must manually omit from help text)
+
+📍 **Example:** [src/RemoteDebug.cpp:1008-1015](src/RemoteDebug.cpp#L1008-L1015) - Help text is just concatenated as-is
+
+**Proposal:**
+Add a structured command registration API that links commands to their handlers and help text:
+
+```cpp
+// Option A: Individual command registration
+Debug.addCommand("status", "Show device status", &cmdStatus);
+Debug.addCommand("reboot", "Restart the device", &cmdReboot);
+Debug.addHiddenCommand("diag", &cmdDiagnostic);  // No help text, but works
+
+// Option B: Command with arguments support
+Debug.addCommand("set", "set <key> <value> - Set a config value", &cmdSet);
+
+// Help is auto-generated from registered commands
+// Hidden commands work but don't appear in help
+```
+
+Alternative lightweight approach (backward compatible):
+```cpp
+// Keep existing API but add optional command validation
+Debug.setHelpProjectsCmds(helpText);
+Debug.setCallBackProjectCmds(&processCommands);
+Debug.registerCommand("status");  // For validation/autocomplete only
+Debug.registerCommand("reboot");
+```
+
+**Benefits:**
+- Help text automatically stays in sync with implemented commands
+- Clear distinction between documented and hidden commands
+- Potential for command validation and autocomplete
+- Better organized code in user sketches
+- Could enable future features like command aliases
+
+**Trade-offs:**
+- More memory usage (storing command table)
+- More complex API than current simple approach
+- May be overkill for simple projects with few commands
+
+**Rationale:**
+The current design prioritizes simplicity and low memory usage, which is appropriate for embedded systems. However, the decoupled help text and callback approach can lead to help documentation becoming out of sync with actual commands. For projects with many custom commands, a structured registration API would reduce maintenance burden and bugs. This could be implemented as an optional layer on top of the existing simple API.
+
+**Priority:** Low  
+**Effort:** Medium
 
 ---
 

@@ -9,14 +9,20 @@
  * - Custom test commands for triggering specific behaviors
  * - Periodic heartbeat messages for connection verification
  * - Predictable, testable output patterns
+ * - Project commands configured via setHelpProjectsCmds() / setCallBackProjectCmds()
  * 
- * Test Commands:
+ * Test Commands (shown in 'h' help via setHelpProjectsCmds):
  *   test_all_levels  - Output one message at each debug level
  *   test_flood       - Send 100 messages quickly (rate limiting test)
  *   test_long        - Send a 500-character message (buffer test)
  *   test_special     - Send message with special characters
  *   test_status      - Output current test state
  *   test_colors      - Output colored messages for each level
+ *   test_echo <msg>  - Echo back the message
+ *   ping             - Respond with pong
+ * 
+ * Hidden Commands (NOT in 'h' help - for testing hidden command behavior):
+ *   hidden_cmd       - Executes but not listed in help
  * 
  * Usage:
  *   1. Update WIFI_SSID and WIFI_PASSWORD below
@@ -305,6 +311,12 @@ void processTestCommands() {
         debugI("pong");
         Debug.clearLastCommand();
     }
+    // Hidden command - intentionally NOT listed in help (for testing)
+    else if (command == "hidden_cmd") {
+        Serial.println("[CMD] hidden_cmd (not in help)");
+        debugI("HIDDEN_CMD_EXECUTED");
+        Debug.clearLastCommand();
+    }
     // API Test Commands - for verifying RemoteDebug API methods
     else if (command == "test_last_cmd") {
         Serial.println("[CMD] test_last_cmd");
@@ -359,6 +371,8 @@ void processTestCommands() {
         debugI("test_silence    - Check isSilence()");
         debugI("test_callback   - Verify callback works");
         debugI("test_help       - Show this help");
+        debugI("=== Hidden Commands (not in 'h' help) ===");
+        debugI("hidden_cmd      - Executes but not shown in main help");
         debugI("=========================");
         Debug.clearLastCommand();
     }
@@ -479,6 +493,21 @@ void setup() {
     Debug.showTime(true);
     Debug.showProfiler(false);
     Debug.setSerialEnabled(true);  // Also output to Serial
+    
+    // Configure project commands - these will appear in help under "Project commands"
+    // Note: Some test commands are intentionally NOT listed here (hidden commands)
+    String helpCmds = "test_all_levels - Output at each debug level\n";
+    helpCmds.concat("test_flood      - Send 100 messages quickly\n");
+    helpCmds.concat("test_long       - Send 500-char message\n");
+    helpCmds.concat("test_special    - Send special characters\n");
+    helpCmds.concat("test_status     - Show device status\n");
+    helpCmds.concat("test_colors     - Show colored messages\n");
+    helpCmds.concat("test_echo <msg> - Echo back the message\n");
+    helpCmds.concat("ping            - Respond with pong");
+    // Note: 'hidden_cmd' is intentionally NOT listed - for testing hidden commands
+    
+    Debug.setHelpProjectsCmds(helpCmds);
+    Debug.setCallBackProjectCmds(&processTestCommands);
     
     #ifdef TEST_PASSWORD
     Debug.setPassword(TEST_PASSWORD);
