@@ -32,6 +32,7 @@
 
 ///// RemoteDebug configuration
 #include "RemoteDebugCfg.h"
+#include "SendBuffer.h"
 #include "TelnetTransport.h"
 
 // Debug enabled ?
@@ -336,9 +337,7 @@ class RemoteDebug : public Print {
     TelnetTransport _telnetTransport;  // Telnet transport wrapper
 
 #ifdef CLIENT_BUFFERING
-    String _bufferSend = "";       // Buffer to send data to web app or telnet client
-    uint16_t _sizeBufferSend = 0;  // Size of it
-    uint32_t _lastTimeSend = 0;    // Last time command send data
+    SendBuffer _sendBuffer;  // Helper to buffer outbound data before sending
 #endif
 
 #ifdef DEBUGGER_ENABLED

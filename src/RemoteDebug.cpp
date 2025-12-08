@@ -188,8 +188,7 @@ bool RemoteDebug::begin(String hostName, uint16_t port, uint8_t startingDebugLev
 
 #ifdef CLIENT_BUFFERING
     // Reserve space to buffer of send
-
-    _bufferPrint.reserve(MAX_SIZE_SEND);
+    _sendBuffer.reserve(MAX_SIZE_SEND);
 
 #endif
 
@@ -234,7 +233,12 @@ RemoteDebug::~RemoteDebug() {
     // Flush
     WiFiClient* client = getTelnetClient();
     if (client && client->connected()) {
-        client->flush();
+    // Avoid deprecated flush() where clear() exists
+#if defined(ESP32)
+    client->clear();
+#else
+    client->flush();
+#endif
     }
 
     // Stop
@@ -353,12 +357,7 @@ void RemoteDebug::handle() {
 #ifdef CLIENT_BUFFERING
         // Client buffering - send data in intervals to avoid delays or if its is too big
 
-        if ((millis() - _lastTimeSend) >= DELAY_TO_SEND || _sizeBufferSend >= MAX_SIZE_SEND) {
-            debugPrint(_bufferSend);
-            _bufferSend = "";
-            _sizeBufferSend = 0;
-            _lastTimeSend = millis();
-        }
+        _sendBuffer.tick(millis(), [this](const String& payload) { debugPrint(payload); });
 #endif
 
 #ifdef MAX_TIME_INACTIVE
@@ -472,9 +471,7 @@ void RemoteDebug::onConnection(boolean connected) {
 
 #ifdef CLIENT_BUFFERING
     // Client buffering - send data in intervals to avoid delays or if its is too big
-    _bufferSend = "";
-    _sizeBufferSend = 0;
-    _lastTimeSend = millis();
+    _sendBuffer.reset(millis());
 #endif
 
     // Password request ? - 18/07/18
@@ -821,29 +818,8 @@ size_t RemoteDebug::write(uint8_t character) {
 #ifndef CLIENT_BUFFERING
                 debugPrint(_bufferPrint);
 #else  // Client buffering
-                uint8_t size = _bufferPrint.length();
-
-                // Buffer too big ?
-                if ((_sizeBufferSend + size) >= MAX_SIZE_SEND) {
-                    // Send it
-                    debugPrint(_bufferSend);
-                    _bufferSend = "";
-                    _sizeBufferSend = 0;
-                    _lastTimeSend = millis();
-                }
-
-                // Add to buffer of send
-                _bufferSend.concat(_bufferPrint);
-                _sizeBufferSend += size;
-
-                // Client buffering - send data in intervals to avoid delays or if its is too big
-                // Not for raw mode
-                if (_showRaw || (millis() - _lastTimeSend) >= DELAY_TO_SEND) {
-                    debugPrint(_bufferSend);
-                    _bufferSend = "";
-                    _sizeBufferSend = 0;
-                    _lastTimeSend = millis();
-                }
+                _sendBuffer.enqueue(_bufferPrint, millis(), _showRaw,
+                                    [this](const String& payload) { debugPrint(payload); });
 #endif
             }
 

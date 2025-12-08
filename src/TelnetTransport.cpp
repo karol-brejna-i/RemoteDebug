@@ -1,5 +1,27 @@
 #include "TelnetTransport.h"
 
+namespace {
+
+// ESP32 renamed WiFiServer::available() to accept(); keep both without warnings.
+static inline WiFiClient acceptClient(WiFiServer& server) {
+#if defined(ESP32)
+    return server.accept();
+#else
+    return server.available();
+#endif
+}
+
+// NetworkClient::clear() replaces flush() on newer cores; guard for compatibility.
+static inline void clearClientBuffer(WiFiClient& client) {
+#if defined(ESP32)
+    client.clear();
+#else
+    client.flush();
+#endif
+}
+
+}  // namespace
+
 TelnetTransport::TelnetTransport() : _server(TELNET_PORT) {}
 
 bool TelnetTransport::begin(uint16_t port) {
@@ -24,7 +46,7 @@ void TelnetTransport::stop() {
 void TelnetTransport::handle() {
     if (_server.hasClient()) {
         if (_client && _client.connected()) {
-            WiFiClient newClient = _server.available();
+            WiFiClient newClient = acceptClient(_server);
             if (newClient && newClient.remoteIP() == _client.remoteIP()) {
                 _client.stop();
                 _client = newClient;
@@ -35,7 +57,7 @@ void TelnetTransport::handle() {
                 return;
             }
         } else {
-            _client = _server.available();
+            _client = acceptClient(_server);
         }
 
         if (!_client) {
@@ -43,7 +65,7 @@ void TelnetTransport::handle() {
         }
 
         _client.setNoDelay(true);
-        _client.flush();
+        clearClientBuffer(_client);
         delay(CONNECTION_BUFFER_CLEAR_DELAY_MS);
         while (_client.available()) {
             _client.read();
@@ -65,7 +87,7 @@ void TelnetTransport::handle() {
 }
 
 bool TelnetTransport::isConnected() const {
-    return (_client && _client.connected());
+    return _client.connected();
 }
 
 void TelnetTransport::disconnect() {

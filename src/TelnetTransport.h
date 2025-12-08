@@ -34,7 +34,7 @@ class TelnetTransport : public IDebugTransport {
 
    private:
     WiFiServer _server;
-    WiFiClient _client;
+    mutable WiFiClient _client;
     ConnectCallback _callback = nullptr;
     bool _wasConnected = false;
 };
