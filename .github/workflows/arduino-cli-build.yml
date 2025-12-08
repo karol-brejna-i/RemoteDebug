@@ -1,0 +1,43 @@
+# GitHub Actions workflow for building RemoteDebug examples with Arduino CLI
+
+# This workflow builds all example sketches for ESP32 and ESP8266 using Arduino CLI.
+# It ensures compatibility with Arduino IDE 2.0 and CLI-based builds.
+
+name: Arduino CLI Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        fqbn: [ "esp32:esp32:esp32", "esp8266:esp8266:d1_mini" ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: latest
+
+      - name: Install board platform
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install ${{ matrix.fqbn }}
+
+      - name: Install library dependencies
+        run: |
+          arduino-cli lib install "WebSockets@2.7.1"
+
+      - name: Build all examples
+        run: |
+          for ex in examples/*; do
+            arduino-cli compile --fqbn ${{ matrix.fqbn }} "$ex"
+          done

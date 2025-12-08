@@ -43,6 +43,6 @@
     ],
     "version": "4.1.0",
     "dependencies": {
-        "links2004/WebSockets": "2.3.4"
+        "links2004/WebSockets": "2.7.1"
     }
 }

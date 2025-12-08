@@ -47,7 +47,7 @@ This document contains suggestions for functional and quality improvements to th
 | Documentation | [4.3](#43-improve-example-documentation) | Improve Example Documentation | Medium | Not Started |
 | Documentation | [4.4](#44-add-troubleshooting-guide) | Add Troubleshooting Guide | Low | Not Started |
 | Testing & CI/CD | [5.1](#51-add-unit-tests) | Add Unit Tests | High | Not Started |
-| Testing & CI/CD | [5.2](#52-add-integration-tests) | Add Integration Tests | Medium | Not Started |
+| Testing & CI/CD | [5.2](#52-add-integration-tests) | Add Integration Tests | Medium | In Progress |
 | Testing & CI/CD | [5.3](#53-set-up-cicd-pipeline) | Set Up CI/CD Pipeline | High | ✅ Done |
 | Testing & CI/CD | [5.4](#54-add-static-analysis) | Add Static Analysis | Medium | Not Started |
 | Testing & CI/CD | [5.5](#55-add-code-coverage-reporting) | Add Code Coverage Reporting | Low | Not Started |
@@ -60,7 +60,7 @@ This document contains suggestions for functional and quality improvements to th
 | Performance | [7.3](#73-add-lazy-evaluation-for-debug-messages) | Add Lazy Evaluation for Debug Messages | Low | Not Started |
 | Performance | [7.4](#74-optimize-profiler-calculations) | Optimize Profiler Calculations | Low | Not Started |
 | Compatibility | [8.1](#81-add-support-for-other-platforms) | Add Support for Other Platforms | Low | Not Started |
-| Compatibility | [8.2](#82-update-websockets-dependency) | Update WebSockets Dependency | Medium | Not Started |
+| Compatibility | [8.2](#82-update-websockets-dependency) | Update WebSockets Dependency | Medium | ✅ Done |
 | Compatibility | [8.3](#83-support-arduino-ide-2x-and-platformio-equally) | Support Arduino IDE 2.x and PlatformIO Equally | Medium | Not Started |
 | Compatibility | [8.4](#84-add-esp-idf-native-support) | Add ESP-IDF Native Support | Low | Not Started |
 | Build | [9.1](#91-improve-build-configuration) | Improve Build Configuration | Medium | ✅ Done |
@@ -284,6 +284,7 @@ Global static variables create hidden dependencies, make testing difficult, and 
 **Proposal:**
 - Use command pattern with registered command handlers
 - Allow users to register custom commands more elegantly
+- Remove `COMMAND_REPEAT_FILTER_MS` time-based workaround by fixing duplicate-command parsing at the source
 
 ```cpp
 Debug.registerCommand("myCmd", [](const String& args) {
@@ -444,7 +445,8 @@ if (port != TELNET_PORT) {  // Bug: not more can use begin(port)..
 📍 **Example:** [src/RemoteDebug.cpp:164](src/RemoteDebug.cpp#L164) - Port parameter is ignored, only default TELNET_PORT works
 
 **Proposal:**
-- Fix the port configuration bug
+- Fix the port configuration bug (honor `begin(host, port)` and equivalent WebSocket port selection)
+- Add regression test in integration harness for a non-default port
 - Allow runtime port configuration for both telnet and websocket
 
 **Rationale:**
@@ -606,20 +608,20 @@ Users encountering problems often search for solutions before opening issues. A 
 ## 5. Testing & CI/CD
 
 > **📚 Detailed Testing Documentation:**
-> - [TESTING_STRATEGY.md](development/TESTING_STRATEGY.md) - Comprehensive testing strategy
-> - [TEST_CASES.md](development/TEST_CASES.md) - Specific test cases with expected results
+> - [TESTING_STRATEGY.md](development/tests/TESTING_STRATEGY.md) - Comprehensive testing strategy
+> - [TEST_CASES.md](development/tests/TEST_CASES.md) - Specific test cases with expected results
 > - [test/integration/run_tests.sh](test/integration/run_tests.sh) - Automated integration test script
 > - [test/integration/test_firmware.ino](test/integration/test_firmware.ino) - Dedicated test firmware
 
 ### 5.1 Add Unit Tests
 
 **Current State:**
-- No tests at all
-- Changes risk introducing regressions
-- 🔧 Testing strategy documented in [development/TESTING_STRATEGY.md](development/TESTING_STRATEGY.md)
+- Unit tests are not implemented yet
+- Integration harness exists (telnet + WebSocket scripts, dedicated test firmware)
+- 🔧 Testing strategy documented in [development/tests/TESTING_STRATEGY.md](development/tests/TESTING_STRATEGY.md) with planned components (CommandParser, MessageFormatter, InputBuffer)
 
 **Proposal:**
-- Add unit tests using PlatformIO Native + Unity framework
+- Add unit tests using PlatformIO 
 - Extract testable components: CommandParser, MessageFormatter, InputBuffer
 - Test core functionality: logging, command processing, formatting
 - Mock network components for isolated testing
@@ -639,14 +641,14 @@ Without tests, every change to the codebase is a leap of faith. Bugs can be intr
 ### 5.2 Add Integration Tests
 
 **Current State:**
-- No automated integration testing
-- ✅ Test infrastructure created:
-  - `test/integration/run_tests.sh` - Automated telnet test script
-  - `test/integration/test_firmware.ino` - Dedicated test firmware
-  - `development/TEST_CASES.md` - 60+ documented test cases
+- Telnet/WebSocket integration harness in place and exercised locally:
+  - `test/integration/run_tests.sh` (telnet) and `test/integration/run_tests_ws.sh` (WebSocket)
+  - `test/integration/test_firmware.ino` with project command help + hidden command coverage
+  - [development/tests/TEST_CASES.md](development/tests/TEST_CASES.md) documents 100+ cases
+- Not yet wired into CI or simulator; currently depends on local hardware
 
 **Proposal:**
-- Create integration tests that run on actual hardware (or QEMU/Wokwi)
+- Create integration tests that run on actual hardware (or Wokwi) in CI
 - Test telnet and websocket connections
 - Automate with HIL (Hardware-in-the-Loop) testing
 
@@ -901,26 +903,18 @@ The IoT ecosystem is diversifying beyond ESP8266/ESP32. The RP2040 (Raspberry Pi
 ### 8.2 Update WebSockets Dependency
 
 **Current State:**
-```
-// There is still "a little problem" with arduinoWebSockets -- 
-// it doesn't compile under ESP32 (latest version 2.4.1), 
-// so we use the older version 2.3.4
-```
-
-📍 **Examples:**
-- [README.md](README.md#L101-L102) - Documentation of version pinning
-- [library.json](library.json#L44) - `"links2004/WebSockets": "2.3.4"` pinned dependency
+- Dependency aligned to `links2004/WebSockets @ 2.7.1` across `platformio.ini` and `library.json`
+- Seeed XIAO ESP32-C6 Arduino core still lacks `WiFiClientSecure`; WebSockets remain disabled there via `WEBSOCKET_DISABLED=true`
 
 **Proposal:**
-- Investigate and fix ESP32 compilation issue with latest WebSockets
-- Consider alternative WebSocket libraries
-- Document the issue and workaround
+- Keep a single pinned version (2.7.x) across build systems and README
+- Document the C6 limitation and ensure WS-enabled envs continue to build on ESP8266/ESP32
 
 **Rationale:**
-Pinning to an older version of a dependency (2.3.4 instead of 2.4.1) means missing out on bug fixes, security patches, and new features. It also creates potential conflicts if users need a newer version for their own code. Resolving this compatibility issue removes a maintenance burden and keeps the library up-to-date.
+Maintaining one modern WebSockets version avoids cross-toolchain conflicts, ensures current fixes are available, and clarifies platform-specific limitations for users.
 
 **Priority:** Medium  
-**Effort:** Medium
+**Effort:** Low
 
 ### 8.3 Support Arduino IDE 2.x and PlatformIO Equally
 
