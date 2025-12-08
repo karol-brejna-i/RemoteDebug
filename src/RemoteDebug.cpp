@@ -54,51 +54,53 @@ bool system_update_cpu_freq(uint8_t freq);
 
 #if not WEBSOCKET_DISABLED
 
-#define debugPrintf(fmt, ...)                        \
-    {                                                \
-        if (_connected)                              \
-            TelnetClient.printf(fmt, ##__VA_ARGS__); \
-        else if (_connectedWS)                       \
-            DebugWS.printf(fmt, ##__VA_ARGS__);      \
+#define debugPrintf(fmt, ...)                                                        \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client)                                                    \
+            client->printf(fmt, ##__VA_ARGS__);                                      \
+        else if (_connectedWS)                                                       \
+            DebugWS.printf(fmt, ##__VA_ARGS__);                                      \
     }
-#define debugPrintln(str)              \
-    {                                  \
-        if (_connected)                \
-            TelnetClient.println(str); \
-        else if (_connectedWS)         \
-            DebugWS.println(str);      \
+#define debugPrintln(str)                                                            \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client)                                                    \
+            client->println(str);                                                    \
+        else if (_connectedWS)                                                       \
+            DebugWS.println(str);                                                    \
     }
-#define debugPrint(str)              \
-    {                                \
-        if (_connected)              \
-            TelnetClient.print(str); \
-        else if (_connectedWS)       \
-            DebugWS.print(str);      \
+#define debugPrint(str)                                                              \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client)                                                    \
+            client->print(str);                                                      \
+        else if (_connectedWS)                                                       \
+            DebugWS.print(str);                                                      \
     }
 
 #else  // With  too
 
-#define debugPrintf(fmt, ...)                                    \
-    {                                                            \
-        if (_connected) TelnetClient.printf(fmt, ##__VA_ARGS__); \
+#define debugPrintf(fmt, ...)                                                        \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client) client->printf(fmt, ##__VA_ARGS__);                \
     }
-#define debugPrintln(str)                          \
-    {                                              \
-        if (_connected) TelnetClient.println(str); \
+#define debugPrintln(str)                                                            \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client) client->println(str);                              \
     }
-#define debugPrint(str)                          \
-    {                                            \
-        if (_connected) TelnetClient.print(str); \
+#define debugPrint(str)                                                              \
+    {                                                                                \
+        WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
+        if (_connected && client) client->print(str);                                \
     }
 
 #endif
 
 // Instance
 static RemoteDebug* _instance;
-
-// WiFi server (telnet)
-static WiFiServer TelnetServer(TELNET_PORT);  // @suppress("Abstract class cannot be instantiated")
-static WiFiClient TelnetClient;               // @suppress("Abstract class cannot be instantiated")
 
 // Support to websocket connection with RemoteDebugApp
 #if not WEBSOCKET_DISABLED
@@ -161,12 +163,18 @@ bool RemoteDebug::begin(String hostName, uint8_t startingDebugLevel) {
 bool RemoteDebug::begin(String hostName, uint16_t port, uint8_t startingDebugLevel) {
     D("RemoteDebug begin")
     // Initialize server telnet
-    if (port != TELNET_PORT) {  // Bug: not more can use begin(port)..
+    _telnetTransport.setConnectCallback([](bool connected) {
+        if (_instance) {
+            _instance->_connected = connected;
+            if (connected) {
+                _instance->onConnection(true);
+            }
+        }
+    });
+
+    if (!_telnetTransport.begin(port)) {  // Bug: not more can use begin(port)..
         return false;
     }
-
-    TelnetServer.begin();
-    TelnetServer.setNoDelay(true);
 
     D("WEB_SOCKETS_DISABLED: %d", WEBSOCKET_DISABLED)
 #if not WEBSOCKET_DISABLED
@@ -209,7 +217,7 @@ void RemoteDebug::initDebugger(boolean (*callbackEnabled)(), void (*callbackHand
 }
 
 WiFiClient* RemoteDebug::getTelnetClient() {
-    return &TelnetClient;
+    return _telnetTransport.client();
 }
 
 #endif
@@ -224,8 +232,9 @@ void RemoteDebug::setPassword(String password) {
 
 RemoteDebug::~RemoteDebug() {
     // Flush
-    if (TelnetClient && TelnetClient.connected()) {
-        TelnetClient.flush();
+    WiFiClient* client = getTelnetClient();
+    if (client && client->connected()) {
+        client->flush();
     }
 
     // Stop
@@ -237,13 +246,7 @@ RemoteDebug::~RemoteDebug() {
 void RemoteDebug::stop() {
     D("rd: stop")
     // Stop Client
-    if (TelnetClient && TelnetClient.connected()) {
-        TelnetClient.stop();
-    }
-
-    // Stop server
-
-    TelnetServer.stop();
+    _telnetTransport.stop();
 
 #if not WEBSOCKET_DISABLED
     // Stop  (RemoteDebugApp)
@@ -297,87 +300,23 @@ void RemoteDebug::handle() {
     }
 #endif
 
-    // look for Client connect trial
-    if (TelnetServer.hasClient()) {
-        // Old connection logic
-
-        //      if (!TelnetClient || !TelnetClient.connected()) {
-        //
-        //        if (TelnetClient) { // Close the last connect - only one supported
-        //
-        //          TelnetClient.stop();
-        //
-        //        }
-
-        // New connection logic - 10/08/17
-
-        if (TelnetClient && TelnetClient.connected()) {
-            // Verify if the IP is same than actual conection
-
-            WiFiClient newClient;  // @suppress("Abstract class cannot be instantiated")
-            newClient = TelnetServer.available();
-            String ip = newClient.remoteIP().toString();
-
-            if (ip == TelnetClient.remoteIP().toString()) {
-                // Reconnect
-
-                TelnetClient.stop();
-                TelnetClient = newClient;
-
-            } else {
-                // Disconnect (not allow more than one connection)
-                newClient.stop();
-
-                return;
-            }
-
-        } else {
-            // New TCP client
-
-            TelnetClient = TelnetServer.available();
-
-            // Password request ? - 18/07/18
-
-            if (_password != "") {
-#ifdef ALPHA_VERSION  // In test, not good yet
-                      // Send command to telnet client to not do local echos
-                      // Experimental code !
-
-                sendTelnetCommand(TELNET_WONT, TELNET_ECHO);
-#endif
-            }
-        }
-
-        if (!TelnetClient) {  // No client yet ???
-            return;
-        }
-
-        // Set client
-        TelnetClient.setNoDelay(true);  // More faster
-        TelnetClient.flush();           // clear input buffer, else you get strange characters
-
-        // Empty buffer
-        delay(CONNECTION_BUFFER_CLEAR_DELAY_MS);
-
-        while (TelnetClient.available()) {
-            TelnetClient.read();
-        }
-
-        // Connection event
-        onConnection(true);
-    }
+    // Transport handling (accepts new clients)
+    _telnetTransport.handle();
 
     // Is client connected ? (to reduce overhead in active)
-    _connected = (TelnetClient && TelnetClient.connected());
+    _connected = _telnetTransport.isConnected();
 
     // Get command over telnet
     if (_connected) {
         char last = ' ';  // To avoid process two times the "\r\n"
 
-        while (TelnetClient.available()) {  // get data from Client
+        while (_telnetTransport.available()) {  // get data from Client
 
             // Get character
-            char character = TelnetClient.read();
+            char character;
+            if (_telnetTransport.read((uint8_t*)&character, 1) != 1) {
+                break;
+            }
 
             // Newline (CR or LF) - once one time if (\r\n) - 26/07/17
             if (isCRLF(character) == true) {
@@ -491,7 +430,10 @@ void RemoteDebug::disconnect(boolean onlyTelnetClient) {
     D("rd onlyTelnetClient %d", onlyTelnetClient);
     if (onlyTelnetClient) {
         if (_connected) {
-            TelnetClient.println("* Closing client connection ...");  // this is to web app new conn not receive it
+            WiFiClient* client = getTelnetClient();
+            if (client) {
+                client->println("* Closing client connection ...");  // this is to web app new conn not receive it
+            }
         }
     } else {
         debugPrintln("* Closing client connection ...");
@@ -501,7 +443,7 @@ void RemoteDebug::disconnect(boolean onlyTelnetClient) {
     _silenceTimeout = 0;
 
     if (_connected) {  // By telnet
-        TelnetClient.stop();
+        _telnetTransport.disconnect();
         _connected = false;
     }
 #if not WEBSOCKET_DISABLED
@@ -1135,7 +1077,7 @@ void RemoteDebug::processCommand() {
 
         debugPrintln("* Closing client connection ...");
 
-        TelnetClient.stop();
+        _telnetTransport.disconnect();
 
     } else if (_command == "m") {
         uint32_t free = ESP.getFreeHeap();
@@ -1327,8 +1269,8 @@ void RemoteDebug::processCommand() {
         debugPrintln("* Resetting the ESP32 ...");
 #endif
 
-        TelnetClient.stop();
-        TelnetServer.stop();
+        _telnetTransport.disconnect();
+        _telnetTransport.stop();
 
 #if not WEBSOCKET_DISABLED
         DebugWS.stop();
@@ -1576,7 +1518,10 @@ void RemoteDebug::sendTelnetCommand(uint8_t command, uint8_t option) {
     // Send a command to the telnet client
 
     debugPrintf("%c%c%c", TELNET_IAC, command, option);
-    TelnetClient.flush();
+    WiFiClient* client = getTelnetClient();
+    if (client) {
+        client->flush();
+    }
 }
 #endif
 

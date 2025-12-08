@@ -32,6 +32,7 @@
 
 ///// RemoteDebug configuration
 #include "RemoteDebugCfg.h"
+#include "TelnetTransport.h"
 
 // Debug enabled ?
 #ifndef DEBUG_DISABLED
@@ -331,6 +332,8 @@ class RemoteDebug : public Print {
     String _filter = "";                             // Filter
     boolean _filterActive = false;
     String _bufferPrint = "";  // Buffer of print write to WiFi
+
+    TelnetTransport _telnetTransport;  // Telnet transport wrapper
 
 #ifdef CLIENT_BUFFERING
     String _bufferSend = "";       // Buffer to send data to web app or telnet client
