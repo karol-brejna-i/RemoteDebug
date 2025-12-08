@@ -3,6 +3,7 @@
 if [ $# -eq 0 ]
   then
     echo "No version number supplied"
+    echo "Usage: update_version.sh <version> [<project_path>]"
     exit 1
 fi
 VERSION=$1
@@ -17,4 +18,6 @@ fi
 
 sed -i "s/\"version\": \"[0-9.]\+\"/\"version\": \"$VERSION\"/" $PROJECT_PATH/library.json
 sed -i "s/VERSION \"[0-9.]\+\"/VERSION \"$VERSION\"/" $PROJECT_PATH/src/RemoteDebugCfg.h
+sed -i "s/version=[0-9.]\+/version=$VERSION/" $PROJECT_PATH/library.properties
 
+echo "Updated version to $VERSION"

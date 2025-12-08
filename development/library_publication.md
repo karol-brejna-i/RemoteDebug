@@ -14,6 +14,7 @@ For publishing the library in the PlatformIO Registry, perform the following ste
 
 - Test the library before releasing
 - Update the library version (in the sources and in the manifest)
+- Update CHANGELOG.md
 - Create a GitHub release
 - Publish the library in the PlatformIO Registry
 
@@ -23,13 +24,19 @@ TBD
 
 ### Update the library version
 
-Right now, the library version number resides in two places:
+Right now, the library version number resides in these places:
 
 - in the `library.json` file
-- in the [RemoteDebug.cpp](../src/RemoteDebug.cpp) file]
+- in the [RemoteDebugCfg.h](../src/RemoteDebugCfg.h) file
 - in the [library.properties](../library.properties) file
 
-Update the version number in both places.
+Update the version number in those places.
+(You can `update_version.sh` script to to this for you.)
+
+### Update CHANGELOG.md
+
+Add a new section to the [CHANGELOG.md](../CHANGELOG.md) file.
+Use the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 ### Create a GitHub release
 
@@ -38,7 +45,7 @@ Tag the current commit with the version number and create a GitHub release.
 If you are using the [GitHub CLI](https://cli.github.com/), you can do it like this:
 
 ```bash
-VERSION=4.0.2
+VERSION=v4.0.4 # Please, note the "v" prefix. PlatformIO registry "likes it".
 
 VERSION_NO=v${VERSION}
 read -r -d '' RELEASE_NOTES << EOM
