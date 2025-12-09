@@ -32,6 +32,8 @@
 
 ///// RemoteDebug configuration
 #include "RemoteDebugCfg.h"
+#include "CommandParser.h"
+#include "DebugState.h"
 #include "SendBuffer.h"
 #include "TelnetTransport.h"
 
@@ -306,23 +308,9 @@ class RemoteDebug : public Print {
     String _password = "";        // Password
     boolean _passwordOk = false;  // Password request ? - 18/07/18
     uint8_t _passwordAttempt = 0;
-    boolean _silence = false;                        // Silence mode ?
-    uint32_t _silenceTimeout = 0;                    // Silence timeout
-    uint8_t _clientDebugLevel = DEBUG;               // Level setted by user in web app or telnet client
-    uint8_t _lastDebugLevel = DEBUG;                 // Last Level setted by active()
-    uint32_t _lastTimePrint = millis();              // Last time print a line
-    uint8_t _levelBeforeProfiler = DEBUG;            // Last Level before Profiler level
-    uint32_t _levelProfilerDisable = 0;              // time in millis to disable the profiler level
-    uint32_t _autoLevelProfiler = 0;                 // Automatic change to profiler level if time between handles is greater than n millis
-    boolean _showTime = false;                       // Show time in millis
-    boolean _showProfiler = false;                   // Show time between messages
-    uint32_t _minTimeShowProfiler = 0;               // Minimal time to show profiler
-    boolean _showDebugLevel = true;                  // Show debug Level
-    boolean _showColors = false;                     // Show colors
-    boolean _showRaw = false;                        // Show in raw mode ?
-    boolean _serialEnabled = false;                  // Send to serial too (not recommended)
     boolean _resetCommandEnabled = false;            // Enable command to reset the board
-    boolean _newLine = true;                         // New line write ?
+
+    DebugState _state;  // Encapsulated debug state (level, filters, display flags)
     uint32_t connectionTimeout = MAX_TIME_INACTIVE;  // Connection Timeout
     String _command = "";                            // Command received
     String _lastCommand = "";                        // Last Command received
@@ -335,6 +323,7 @@ class RemoteDebug : public Print {
     String _bufferPrint = "";  // Buffer of print write to WiFi
 
     TelnetTransport _telnetTransport;  // Telnet transport wrapper
+    CommandParser _parser;  // Command parser for telnet/WS commands
 
 #ifdef CLIENT_BUFFERING
     SendBuffer _sendBuffer;  // Helper to buffer outbound data before sending

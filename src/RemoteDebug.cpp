@@ -198,8 +198,8 @@ bool RemoteDebug::begin(String hostName, uint16_t port, uint8_t startingDebugLev
 
     // Debug level
 
-    _clientDebugLevel = startingDebugLevel;
-    _lastDebugLevel = startingDebugLevel;
+    _state.setLevel(startingDebugLevel);
+    _state.setLastLevel(startingDebugLevel);
 
     return true;
 }
@@ -273,15 +273,15 @@ void RemoteDebug::handle() {
 
     // Silence timeout ?
 
-    if (_silence && _silenceTimeout > 0 && millis() >= _silenceTimeout) {
+    if (_state.isSilence() && _state.silenceTimeout() > 0 && millis() >= _state.silenceTimeout()) {
         // Get out of silence mode
         silence(false, true);
     }
 
     // Debug level is profiler -> set the level before
-    if (_clientDebugLevel == PROFILER) {
-        if (millis() > _levelProfilerDisable) {
-            _clientDebugLevel = _levelBeforeProfiler;
+    if (_state.getLevel() == PROFILER) {
+        if (millis() > _state.getLevelProfilerDisable()) {
+            _state.setLevel(_state.getLevelBeforeProfiler());
             debugPrintln("* Debug level profile inactive now");
         }
     }
@@ -289,13 +289,13 @@ void RemoteDebug::handle() {
 #ifdef ALPHA_VERSION  // In test, not good yet
 
     // Automatic change to profiler level if time between handles is greater than n millis
-    if (_autoLevelProfiler > 0 && _clientDebugLevel != PROFILER) {
+    if (_state.getAutoLevelProfiler() > 0 && _state.getLevel() != PROFILER) {
         uint32_t diff = (millis() - lastTime);
 
-        if (diff >= _autoLevelProfiler) {
-            _levelBeforeProfiler = _clientDebugLevel;
-            _clientDebugLevel = PROFILER;
-            _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Disable after default timeout
+        if (diff >= _state.getAutoLevelProfiler()) {
+            _state.setLevelBeforeProfiler(_state.getLevel());
+            _state.setLevel(PROFILER);
+            _state.setLevelProfilerDisable(PROFILER_DEFAULT_TIMEOUT_MS);  // Disable after default timeout
 
             debugPrintf("* Debug level profile active now - time between handels: %u\r\n", diff);
         }
@@ -438,8 +438,8 @@ void RemoteDebug::disconnect(boolean onlyTelnetClient) {
         debugPrintln("* Closing client connection ...");
     }
 
-    _silence = false;
-    _silenceTimeout = 0;
+    _state.setSilence(false);
+    _state.setSilenceTimeout(0);
 
     if (_connected) {  // By telnet
         _telnetTransport.disconnect();
@@ -465,9 +465,9 @@ void RemoteDebug::onConnection(boolean connected) {
     _lastTimeCommand = millis();  // To mark time for inactivity
     _command = "";                // Clear command
     _lastCommand = "";            // Clear las command
-    _lastTimePrint = millis();    // Clear the time
-    _silence = false;             // No silence
-    _silenceTimeout = 0;
+    _state.setLastTimePrint(millis());    // Clear the time
+    _state.setSilence(false);             // No silence
+    _state.setSilenceTimeout(0);
 
 #ifdef CLIENT_BUFFERING
     // Client buffering - send data in intervals to avoid delays or if its is too big
@@ -515,8 +515,8 @@ boolean RemoteDebug::isConnected() {
 
 // Send to serial too (use only if need)
 void RemoteDebug::setSerialEnabled(boolean enable) {
-    _serialEnabled = enable;
-    _showColors = false;  // Disable it for Serial
+    _state.setSerialEnabled(enable);
+    _state.setShowColors(false);  // Disable it for Serial
 }
 
 // Allow ESP reset over telnet client
@@ -528,44 +528,44 @@ void RemoteDebug::setResetCmdEnabled(boolean enable) {
 // Show time in millis
 
 void RemoteDebug::showTime(boolean show) {
-    _showTime = show;
+    _state.setShowTime(show);
 }
 
 // Show profiler - time in millis between messages of debug
 
 void RemoteDebug::showProfiler(boolean show, uint32_t minTime) {
-    _showProfiler = show;
-    _minTimeShowProfiler = minTime;
+    _state.setShowProfiler(show);
+    _state.setMinTimeShowProfiler(minTime);
 }
 
 #ifdef ALPHA_VERSION  // In test, not good yet
 // Automatic change to profiler level if time between handles is greater than n mills (0 - disable)
 
 void RemoteDebug::autoProfilerLevel(uint32_t millisElapsed) {
-    _autoLevelProfiler = millisElapsed;
+    _state.setAutoLevelProfiler(millisElapsed);
 }
 #endif
 
 // Show debug level
 
 void RemoteDebug::showDebugLevel(boolean show) {
-    _showDebugLevel = show;
+    _state.setShowDebugLevel(show);
 }
 
 // Show colors
 
 void RemoteDebug::showColors(boolean show) {
-    if (_serialEnabled == false) {
-        _showColors = show;
+    if (_state.serialEnabled() == false) {
+        _state.setShowColors(show);
     } else {
-        _showColors = false;  // Disable it for Serial
+        _state.setShowColors(false);  // Disable it for Serial
     }
 }
 
 // Show in raw mode - only data ?
 
 void RemoteDebug::showRaw(boolean show) {
-    _showRaw = show;
+    _state.setShowRaw(show);
 }
 
 // Is active ? client telnet connected and level of debug equal or greater then set by user in telnet
@@ -579,16 +579,16 @@ boolean RemoteDebug::isActive(uint8_t debugLevel) {
     //	Password ok (if enabled) - 18/08/18
 
 #if not WEBSOCKET_DISABLED
-    boolean ret = (debugLevel >= _clientDebugLevel &&
-                   !_silence &&
-                   (_connected || _connectedWS || _serialEnabled));
+    boolean ret = (debugLevel >= _state.getLevel() &&
+                   !_state.isSilence() &&
+                   (_connected || _connectedWS || _state.serialEnabled()));
 #else  // Telnet only
-    boolean ret = (debugLevel >= _clientDebugLevel &&
-                   !_silence &&
-                   (_connected || _serialEnabled));
+    boolean ret = (debugLevel >= _state.getLevel() &&
+                   !_state.isSilence() &&
+                   (_connected || _state.serialEnabled()));
 #endif
     if (ret) {
-        _lastDebugLevel = debugLevel;
+        _state.setLastLevel(debugLevel);
     }
 
     return ret;
@@ -634,16 +634,16 @@ size_t RemoteDebug::write(uint8_t character) {
 #endif
 
     // In silent mode now ?
-    if (_silence) {
+    if (_state.isSilence()) {
         return 0;
     }
 
     // New line writted before ?
-    if (_newLine) {
+    if (_state.isNewLine()) {
 #ifdef DEBUGGER_ENABLED
         // For Simple software debugger - based on SerialDebug Library
         // Changed handle debugger logic - 2018-02-29
-        if (!_showRaw) {  // Not for raw mode
+        if (!_state.showRaw()) {  // Not for raw mode
 
             if (_callbackDbgEnabled && _callbackDbgEnabled()) {  // Callbacks ok
 
@@ -658,10 +658,10 @@ size_t RemoteDebug::write(uint8_t character) {
         String show = "";
 
         // Not in raw mode (only data)
-        if (!_showRaw) {
+        if (!_state.showRaw()) {
             // New color system
-            if (_showColors) {
-                switch (_lastDebugLevel) {
+            if (_state.showColors()) {
+                switch (_state.getLastLevel()) {
                     case VERBOSE:
                         show = COLOR_VERBOSE;
                         break;
@@ -682,8 +682,8 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show debug level
-            if (_showDebugLevel) {
-                switch (_lastDebugLevel) {
+            if (_state.showDebugLevel()) {
+                switch (_state.getLastLevel()) {
                     case PROFILER:
                         show.concat("(P");
                         break;
@@ -706,7 +706,7 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show time in millis
-            if (_showTime) {
+            if (_state.showTime()) {
                 if (show != "") {
                     show.concat(" ");
                 }
@@ -716,13 +716,13 @@ size_t RemoteDebug::write(uint8_t character) {
             }
 
             // Show profiler (time between messages)
-            if (_showProfiler) {
-                elapsed = (millis() - _lastTimePrint);
+            if (_state.showProfiler()) {
+                elapsed = (millis() - _state.lastTimePrint());
                 boolean resetColors = false;
                 if (show != "") {
                     show.concat(" ");
                 }
-                if (_showColors) {
+                if (_state.showColors()) {
                     if (elapsed < PROFILER_THRESHOLD_GREEN_MS) {
                         ;  // not color this
                     } else if (elapsed < PROFILER_THRESHOLD_YELLOW_MS) {
@@ -750,7 +750,7 @@ size_t RemoteDebug::write(uint8_t character) {
                     show.concat(COLOR_RESET);
                     show.concat(colorLevel);
                 }
-                _lastTimePrint = millis();
+                _state.setLastTimePrint(millis());
             }
         } else {  // Raw mode - only data - e.g. used for debugger messages
             show.concat(COLOR_RAW);
@@ -758,17 +758,17 @@ size_t RemoteDebug::write(uint8_t character) {
 
         // Show anything ?
         if (show != "") {
-            if (!_showRaw) {
+            if (!_state.showRaw()) {
                 show.concat(") ");
             }
 
             // Write to telnet buffered
-            if (connected || _serialEnabled) {  // send data to Client
+            if (connected || _state.serialEnabled()) {  // send data to Client
                 _bufferPrint = show;
             }
         }
 
-        _newLine = false;
+        _state.setNewLine(false);
     }
 
     // Print ?
@@ -778,7 +778,7 @@ size_t RemoteDebug::write(uint8_t character) {
     if (character == '\n') {
         _bufferPrint.concat("\r");  // Para clientes windows - 29/01/17
 
-        _newLine = true;
+        _state.setNewLine(true);
         doPrint = true;
 
     } else if (_bufferPrint.length() == BUFFER_PRINT) {  // Limit of buffer
@@ -792,20 +792,20 @@ size_t RemoteDebug::write(uint8_t character) {
     if (doPrint) {  // Print the buffer
         boolean noPrint = false;
 
-        if (_showProfiler && elapsed < _minTimeShowProfiler) {  // Profiler time Minimal
+        if (_state.showProfiler() && elapsed < _state.minTimeShowProfiler()) {  // Profiler time Minimal
             noPrint = true;
-        } else if (_filterActive) {  // Check filter before print
+        } else if (_state.filterActive()) {  // Check filter before print
 
             String aux = _bufferPrint;
             aux.toLowerCase();
 
-            if (aux.indexOf(_filter) == -1) {  // not find -> no print
+            if (aux.indexOf(_state.filter()) == -1) {  // not find -> no print
                 noPrint = true;
             }
         }
 
         if (noPrint == false) {
-            if (_showColors) _bufferPrint.concat(COLOR_RESET);
+            if (_state.showColors()) _bufferPrint.concat(COLOR_RESET);
             // Send to telnet or websocket (buffered)
             boolean sendToClient = connected;
 
@@ -818,13 +818,13 @@ size_t RemoteDebug::write(uint8_t character) {
 #ifndef CLIENT_BUFFERING
                 debugPrint(_bufferPrint);
 #else  // Client buffering
-                _sendBuffer.enqueue(_bufferPrint, millis(), _showRaw,
+                _sendBuffer.enqueue(_bufferPrint, millis(), _state.showRaw(),
                                     [this](const String& payload) { debugPrint(payload); });
 #endif
             }
 
             // Echo to serial (not buffering it)
-            if (_serialEnabled) {
+            if (_state.serialEnabled()) {
                 Serial.print(_bufferPrint);
             }
         }
@@ -1028,34 +1028,31 @@ void RemoteDebug::processCommand() {
     debugPrint("* Debug: Command received: ");
     debugPrintln(_command);
 
-    String options = "";
-    uint8_t pos = _command.indexOf(" ");
-    if (pos > 0) {
-        options = _command.substring(pos + 1);
-    }
-
     // Set time of last command received
     _lastTimeCommand = millis();
 
-    // Get out of silent mode
-    if (_command != "s" && _silence) {
+    // Parse the command
+    CommandParser::Result parsed = _parser.parse(_command);
+    const String& options = parsed.argument;
+
+    // Get out of silent mode (unless command is silence toggle)
+    if (parsed.command != CommandParser::Command::ToggleSilence && _state.isSilence()) {
         silence(false, true);
     }
 
-    // Process the command
-    if (_command == "h" || _command == "?") {
-        // Show help
+    // Process the command using parsed result
+    switch (parsed.command) {
+    case CommandParser::Command::Help:
         D("processCommand: show help")
         showHelp();
+        break;
 
-    } else if (_command == "q") {
-        // Quit
-
+    case CommandParser::Command::Quit:
         debugPrintln("* Closing client connection ...");
-
         _telnetTransport.disconnect();
+        break;
 
-    } else if (_command == "m") {
+    case CommandParser::Command::Memory: {
         uint32_t free = ESP.getFreeHeap();
 
         debugPrint("* Free Heap RAM: ");
@@ -1069,93 +1066,76 @@ void RemoteDebug::processCommand() {
         }
 
 #endif
+        break;
+    }
 
 #if defined(ESP8266)
-    } else if (_command == "cpu80") {
+    case CommandParser::Command::Cpu80:
         // Change ESP8266 CPU to 80 MHz
         system_update_cpu_freq(80);
         debugPrintln("CPU ESP8266 changed to: 80 MHz");
-    } else if (_command == "cpu160") {
+        break;
+
+    case CommandParser::Command::Cpu160:
         // Change ESP8266 CPU to 160 MHz
         system_update_cpu_freq(160);
         debugPrintln("CPU ESP8266 changed to: 160 MHz");
-
+        break;
 #endif
 
-    } else if (_command == "v") {
-        // Debug level
-
-        _clientDebugLevel = VERBOSE;
-
+    case CommandParser::Command::LevelVerbose:
+        _state.setLevel(VERBOSE);
         debugPrintln("* Debug level set to Verbose");
-
 #if not WEBSOCKET_DISABLED
         wsSendLevelInfo();
 #endif
+        break;
 
-    } else if (_command == "d") {
-        // Debug level
-
-        _clientDebugLevel = DEBUG;
-
+    case CommandParser::Command::LevelDebug:
+        _state.setLevel(DEBUG);
         debugPrintln("* Debug level set to Debug");
-
 #if not WEBSOCKET_DISABLED
         wsSendLevelInfo();
 #endif
+        break;
 
-    } else if (_command == "i") {
-        // Debug level
-
-        _clientDebugLevel = INFO;
-
+    case CommandParser::Command::LevelInfo:
+        _state.setLevel(INFO);
         debugPrintln("* Debug level set to Info");
-
 #if not WEBSOCKET_DISABLED
         wsSendLevelInfo();
 #endif
+        break;
 
-    } else if (_command == "w") {
-        // Debug level
-
-        _clientDebugLevel = WARNING;
-
+    case CommandParser::Command::LevelWarning:
+        _state.setLevel(WARNING);
         debugPrintln("* Debug level set to Warning");
-
 #if not WEBSOCKET_DISABLED
         wsSendLevelInfo();
 #endif
+        break;
 
-    } else if (_command == "e") {
-        // Debug level
-
-        _clientDebugLevel = ERROR;
-
+    case CommandParser::Command::LevelError:
+        _state.setLevel(ERROR);
         debugPrintln("* Debug level set to Error");
-
 #if not WEBSOCKET_DISABLED
         wsSendLevelInfo();
 #endif
+        break;
 
-    } else if (_command == "l") {
-        // Show debug level
-
-        _showDebugLevel = !_showDebugLevel;
-
+    case CommandParser::Command::ToggleLevel:
+        _state.setShowDebugLevel(!_state.showDebugLevel());
         debugPrintf("* Show debug level: %s\r\n",
-                    (_showDebugLevel) ? "On" : "Off");
+                    (_state.showDebugLevel()) ? "On" : "Off");
+        break;
 
-    } else if (_command == "t") {
-        // Show time
+    case CommandParser::Command::ToggleTime:
+        _state.setShowTime(!_state.showTime());
+        debugPrintf("* Show time: %s\r\n", (_state.showTime()) ? "On" : "Off");
+        break;
 
-        _showTime = !_showTime;
-
-        debugPrintf("* Show time: %s\r\n", (_showTime) ? "On" : "Off");
-
-    } else if (_command.startsWith("timeout")) {
-        // Set or get connection timeout
-
-        if (options.length() > 0) {  // With minimal time
+    case CommandParser::Command::Timeout:
+        if (options.length() > 0) {
             if ((options.toInt() >= 60) || (options.toInt() == 0)) {
                 connectionTimeout = options.toInt() * 1000;
             } else {
@@ -1163,145 +1143,145 @@ void RemoteDebug::processCommand() {
             }
         }
         debugPrintf("* Connection Timeout: %d seconds (0=disabled)\r\n", connectionTimeout / 1000);
+        break;
 
-    } else if (_command == "s") {
-        // Toogle silence (new) = 28/08/18
+    case CommandParser::Command::ToggleSilence:
+        silence(!_state.isSilence());
+        break;
 
-        silence(!_silence);
-
-    } else if (_command == "p") {
-        // Show profiler
-
-        _showProfiler = !_showProfiler;
-        _minTimeShowProfiler = 0;
-
+    case CommandParser::Command::ToggleProfiler:
+        _state.setShowProfiler(!_state.showProfiler());
+        _state.setMinTimeShowProfiler(0);
         debugPrintf("* Show profiler: %s\r\n",
-                    (_showProfiler) ? "On" : "Off");
+                    (_state.showProfiler()) ? "On" : "Off");
+        break;
 
-    } else if (_command.startsWith("p ")) {
-        // Show profiler with minimal time
-        if (options.length() > 0) {  // With minimal time
+    case CommandParser::Command::ProfilerMin:
+        if (options.length() > 0) {
             int32_t aux = options.toInt();
-            if (aux > 0) {  // Valid number
-                _showProfiler = true;
-                _minTimeShowProfiler = aux;
-                debugPrintf("* Show profiler: On (with minimal time: %u)\r\n", _minTimeShowProfiler);
+            if (aux > 0) {
+                _state.setShowProfiler(true);
+                _state.setMinTimeShowProfiler(aux);
+                debugPrintf("* Show profiler: On (with minimal time: %u)\r\n", _state.minTimeShowProfiler());
+            }
+        }
+        break;
+
+    case CommandParser::Command::ProfilerLevel:
+        _state.setLevelBeforeProfiler(_state.getLevel());
+        _state.setLevel(PROFILER);
+
+        if (_state.showProfiler() == false) {
+            _state.setShowProfiler(true);
+        }
+
+        _state.setLevelProfilerDisable(PROFILER_DEFAULT_TIMEOUT_MS);  // Default
+
+        if (options.length() > 0) {
+            int32_t aux = options.toInt();
+            if (aux > 0) {
+                _state.setLevelProfilerDisable(millis() + aux);
             }
         }
 
-    } else if (_command == "P") {
-        // Debug level profile
-        _levelBeforeProfiler = _clientDebugLevel;
-        _clientDebugLevel = PROFILER;
+        debugPrintf("* Debug level set to Profiler (disable in %u millis)\r\n", _state.getLevelProfilerDisable());
+        break;
 
-        if (_showProfiler == false) {
-            _showProfiler = true;
-        }
+    case CommandParser::Command::AutoProfiler:
+        _state.setAutoLevelProfiler(AUTO_PROFILER_DEFAULT_MS);  // Default
 
-        _levelProfilerDisable = PROFILER_DEFAULT_TIMEOUT_MS;  // Default
-
-        if (options.length() > 0) {  // With time of disable
+        if (options.length() > 0) {
             int32_t aux = options.toInt();
-            if (aux > 0) {  // Valid number
-                _levelProfilerDisable = millis() + aux;
+            if (aux > 0) {
+                _state.setAutoLevelProfiler(aux);
             }
         }
 
-        debugPrintf("* Debug level set to Profiler (disable in %u millis)\r\n", _levelProfilerDisable);
+        debugPrintf("* Auto profiler debug level active (time >= %u millis)\r\n", _state.getAutoLevelProfiler());
+        break;
 
-    } else if (_command == "A") {
-        // Auto debug level profile
+    case CommandParser::Command::ToggleColors:
+        _state.setShowColors(!_state.showColors());
+        debugPrintf("* Show colors: %s\r\n", (_state.showColors()) ? "On" : "Off");
+        break;
 
-        _autoLevelProfiler = AUTO_PROFILER_DEFAULT_MS;  // Default
-
-        if (options.length() > 0) {  // With time of disable
-            int32_t aux = options.toInt();
-            if (aux > 0) {  // Valid number
-                _autoLevelProfiler = aux;
-            }
-        }
-
-        debugPrintf("* Auto profiler debug level active (time >= %u millis)\r\n", _autoLevelProfiler);
-
-    } else if (_command == "c") {
-        // Show colors
-
-        _showColors = !_showColors;
-        debugPrintf("* Show colors: %s\r\n", (_showColors) ? "On" : "Off");
-
-    } else if (_command.startsWith("filter ") && options.length() > 0) {
+    case CommandParser::Command::Filter:
         setFilter(options);
+        break;
 
-    } else if (_command == "nofilter") {
+    case CommandParser::Command::NoFilter:
         setNoFilter();
-    } else if (_command == "reset" && _resetCommandEnabled) {
-        debugPrintln("* Reset ...");
+        break;
 
-        debugPrintln("* Closing client connection ...");
+    case CommandParser::Command::Reset:
+        if (_resetCommandEnabled) {
+            debugPrintln("* Reset ...");
+            debugPrintln("* Closing client connection ...");
 
 #if defined(ESP8266)
-        debugPrintln("* Resetting the ESP8266 ...");
+            debugPrintln("* Resetting the ESP8266 ...");
 #elif defined(ESP32)
-        debugPrintln("* Resetting the ESP32 ...");
+            debugPrintln("* Resetting the ESP32 ...");
 #endif
 
-        _telnetTransport.disconnect();
-        _telnetTransport.stop();
+            _telnetTransport.disconnect();
+            _telnetTransport.stop();
 
 #if not WEBSOCKET_DISABLED
-        DebugWS.stop();
+            DebugWS.stop();
 #endif
 
-        delay(RESET_DELAY_MS);
+            delay(RESET_DELAY_MS);
 
-        // Reset
-
-        ESP.restart();
+            // Reset
+            ESP.restart();
+        }
+        break;
 
 #ifdef DEBUGGER_ENABLED
-
-    } else if (!_callbackDbgProcessCmd && _command.startsWith("dbg")) {
-        // Show a message of debugger not is active
-
-        debugPrintln("* RemoteDebugger not activate for this project");
-        debugPrintln("* Please access it to see how activate this:");
-        debugPrintln("* https://github.com/JoaoLopesF/RemoteDebugger");
-
+    case CommandParser::Command::Debugger:
+        if (_callbackDbgProcessCmd) {
+            _callbackDbgProcessCmd();
+        } else {
+            debugPrintln("* RemoteDebugger not activate for this project");
+            debugPrintln("* Please access it to see how activate this:");
+            debugPrintln("* https://github.com/JoaoLopesF/RemoteDebugger");
+        }
+        break;
 #endif
 
-    } else {
+    case CommandParser::Command::Custom:
+    case CommandParser::Command::None:
+    default:
         // Callbacks
 
 #ifdef DEBUGGER_ENABLED
         // Process commands for the debugger
-
         if (_callbackDbgProcessCmd) {
             _callbackDbgProcessCmd();
         }
 #endif
 
         // Project commands - set by programmer
-
         if (_callbackProjectCmds) {
             _callbackProjectCmds();
         }
+        break;
     }
 }
 
 // Filter
 
 void RemoteDebug::setFilter(String filter) {
-    _filter = filter;
-    _filter.toLowerCase();  // TODO: option to case insensitive ?
-    _filterActive = true;
+    filter.toLowerCase();  // TODO: option to case insensitive ?
+    _state.setFilter(filter);
 
     debugPrint("* Debug: Filter active: ");
-    debugPrintln(_filter);
+    debugPrintln(_state.filter());
 }
 
 void RemoteDebug::setNoFilter() {
-    _filter = "";
-    _filterActive = false;
+    _state.clearFilter();
 
     debugPrintln("* Debug: Filter disabled");
 }
@@ -1330,22 +1310,22 @@ void RemoteDebug::silence(boolean activate, boolean showMessage, boolean fromBre
 
     // Set it
 
-    _silence = activate;
-    _silenceTimeout = (timeout == 0) ? 0 : (millis() + timeout);
+    _state.setSilence(activate);
+    _state.setSilenceTimeout((timeout == 0) ? 0 : (millis() + timeout));
 
 #if not WEBSOCKET_DISABLED
 
     // Send status to app
 
     if (_connectedWS) {
-        DebugWS.printf("$app:S:%c\n", ((_silence) ? '1' : '0'));
+        DebugWS.printf("$app:S:%c\n", ((_state.isSilence()) ? '1' : '0'));
     }
 
 #endif
 }
 
 boolean RemoteDebug::isSilence() {
-    return _silence;
+    return _state.isSilence();
 }
 
 // Format numbers
@@ -1448,7 +1428,7 @@ void RemoteDebug::wsSendInfo() {
 void RemoteDebug::wsSendLevelInfo() {
     // Send debug level info to app
     if (_connectedWS) {
-        DebugWS.printf("$app:L:%u\n", _clientDebugLevel);
+        DebugWS.printf("$app:L:%u\n", _state.getLevel());
     }
 }
 
