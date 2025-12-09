@@ -36,6 +36,9 @@
 #include "DebugState.h"
 #include "SendBuffer.h"
 #include "TelnetTransport.h"
+#if not WEBSOCKET_DISABLED
+#include "WebSocketTransport.h"
+#endif
 
 // Debug enabled ?
 #ifndef DEBUG_DISABLED
@@ -280,6 +283,8 @@ class RemoteDebug : public Print {
     void wsOnReceive(const char* command);
     void wsSendInfo();
     void wsSendLevelInfo();
+    bool isWsConnected() const { return _wsTransport.isConnected(); }
+    void wsWrite(const String& str);
 #endif
     boolean wsIsConnected();
 
@@ -323,6 +328,9 @@ class RemoteDebug : public Print {
     String _bufferPrint = "";  // Buffer of print write to WiFi
 
     TelnetTransport _telnetTransport;  // Telnet transport wrapper
+#if not WEBSOCKET_DISABLED
+    WebSocketTransport _wsTransport;   // WebSocket transport wrapper
+#endif
     CommandParser _parser;  // Command parser for telnet/WS commands
 
 #ifdef CLIENT_BUFFERING

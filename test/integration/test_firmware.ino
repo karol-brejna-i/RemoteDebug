@@ -48,6 +48,7 @@
 // Device configuration
 #define HOSTNAME "remotedebug-test"
 #define TELNET_PORT 23
+#define TEST_FIRMWARE_VERSION "1.1.0"  // Increment when firmware changes
 
 // LED configuration - uses built-in LED for status indication
 // Status patterns:
@@ -470,7 +471,7 @@ void setup() {
     
     Serial.println();
     Serial.println("========================================");
-    Serial.println("  RemoteDebug Test Firmware v1.0");
+    Serial.println("  RemoteDebug Test Firmware v" TEST_FIRMWARE_VERSION);
     Serial.println("========================================");
     
     // Connect to WiFi
@@ -523,7 +524,7 @@ void setup() {
     Serial.println();
     
     // Startup message
-    debugI("TEST_FIRMWARE_READY v1.0");
+    debugI("TEST_FIRMWARE_READY v%s", TEST_FIRMWARE_VERSION);
     debugI("Hostname: %s", HOSTNAME);
     debugI("IP: %s", WiFi.localIP().toString().c_str());
     debugI("Type 'test_help' for test commands");

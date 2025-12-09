@@ -5,6 +5,7 @@
 class IDebugTransport {
    public:
     using ConnectCallback = void (*)(bool connected);
+    using ReceiveCallback = void (*)(const char* message);
     virtual ~IDebugTransport() = default;
 
     virtual bool begin(uint16_t port) = 0;
@@ -19,4 +20,5 @@ class IDebugTransport {
     virtual int read(uint8_t* buffer, size_t maxLen) = 0;
 
     virtual void setConnectCallback(ConnectCallback cb) = 0;
+    virtual void setReceiveCallback(ReceiveCallback cb) { (void)cb; }  // Optional, default no-op
 };

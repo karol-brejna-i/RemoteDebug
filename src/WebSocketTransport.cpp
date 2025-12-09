@@ -13,7 +13,7 @@
 WebSocketTransport* WebSocketTransport::_instance = nullptr;
 
 WebSocketTransport::WebSocketTransport()
-    : _server(nullptr), _clientNum(-1), _connectCallback(nullptr), _hasNewLine(false) {
+    : _server(nullptr), _clientNum(-1), _connectCallback(nullptr), _receiveCallback(nullptr), _hasNewLine(false) {
     _instance = this;
 }
 
@@ -119,6 +119,10 @@ void WebSocketTransport::setConnectCallback(ConnectCallback cb) {
     _connectCallback = cb;
 }
 
+void WebSocketTransport::setReceiveCallback(ReceiveCallback cb) {
+    _receiveCallback = cb;
+}
+
 void WebSocketTransport::sendAppInit() {
     if (_server && _clientNum >= 0) {
         _server->sendTXT(_clientNum, "$app:I");
@@ -159,8 +163,13 @@ void WebSocketTransport::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* p
         case WStype_TEXT:
             D("[%u] Text: %s", num, payload);
             if (num == _instance->_clientNum && length > 0) {
-                _instance->_receiveBuffer = String((char*)payload);
-                _instance->_hasNewLine = true;
+                // Use callback if set, otherwise buffer for read()
+                if (_instance->_receiveCallback) {
+                    _instance->_receiveCallback((const char*)payload);
+                } else {
+                    _instance->_receiveBuffer = String((char*)payload);
+                    _instance->_hasNewLine = true;
+                }
             }
             break;
 

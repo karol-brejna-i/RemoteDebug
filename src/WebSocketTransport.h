@@ -32,6 +32,7 @@ class WebSocketTransport : public IDebugTransport {
     int read(uint8_t* buffer, size_t maxLen) override;
 
     void setConnectCallback(ConnectCallback cb) override;
+    void setReceiveCallback(ReceiveCallback cb) override;
 
     // WebSocket-specific: send initial app message
     void sendAppInit();
@@ -44,6 +45,7 @@ class WebSocketTransport : public IDebugTransport {
     WebSocketsServer* _server;
     int8_t _clientNum;
     ConnectCallback _connectCallback;
+    ReceiveCallback _receiveCallback;
     String _receiveBuffer;
     bool _hasNewLine;
 };

@@ -41,14 +41,17 @@ bool system_update_cpu_freq(uint8_t freq);
 // Support to websocket connection with RemoteDebugApp
 // Note: you must install the arduinoWebSocket library before
 
-#if not WEBSOCKET_DISABLED
-#include "RemoteDebugWS.h"
-#endif
-
 // Internal debug macro - recommended to stay disabled
 #define D(fmt, ...)
 // use the following line to enable debug
 // #define D(fmt, ...) Serial.printf("rd: " fmt "\n", ##__VA_ARGS__);  // Serial debug
+
+// Forward declarations for WS helper functions
+#if not WEBSOCKET_DISABLED
+static void wsPrintf(const char* fmt, ...);
+static void wsPrint(const String& str);
+static void wsPrintln(const String& str);
+#endif
 
 // Internal print macros for send messages to client
 
@@ -59,27 +62,27 @@ bool system_update_cpu_freq(uint8_t freq);
         WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
         if (_connected && client)                                                    \
             client->printf(fmt, ##__VA_ARGS__);                                      \
-        else if (_connectedWS)                                                       \
-            DebugWS.printf(fmt, ##__VA_ARGS__);                                      \
+        else if (_instance && _instance->isWsConnected())                            \
+            wsPrintf(fmt, ##__VA_ARGS__);                                            \
     }
 #define debugPrintln(str)                                                            \
     {                                                                                \
         WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
         if (_connected && client)                                                    \
             client->println(str);                                                    \
-        else if (_connectedWS)                                                       \
-            DebugWS.println(str);                                                    \
+        else if (_instance && _instance->isWsConnected())                            \
+            wsPrintln(str);                                                          \
     }
 #define debugPrint(str)                                                              \
     {                                                                                \
         WiFiClient* client = (_instance ? _instance->getTelnetClient() : nullptr);   \
         if (_connected && client)                                                    \
             client->print(str);                                                      \
-        else if (_connectedWS)                                                       \
-            DebugWS.print(str);                                                      \
+        else if (_instance && _instance->isWsConnected())                            \
+            wsPrint(str);                                                            \
     }
 
-#else  // With  too
+#else  // Websocket disabled
 
 #define debugPrintf(fmt, ...)                                                        \
     {                                                                                \
@@ -121,45 +124,32 @@ static const char* const DEBUG_LEVEL_COLORS[] = {
 // Instance
 static RemoteDebug* _instance;
 
-// Support to websocket connection with RemoteDebugApp
+// WebSocket helper functions for printf-style output
 #if not WEBSOCKET_DISABLED
 
-// Instance of RemoteDebugWS
-static RemoteDebugWS DebugWS;  // @suppress("Abstract class cannot be instantiated")
+static void wsPrintf(const char* fmt, ...) {
+    if (!_instance || !_instance->isWsConnected()) return;
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    String s(buf);
+    s.concat('\n');  // WebSocket messages are newline-terminated
+    _instance->wsWrite(s);
+}
 
-static boolean _connectedWS = false;  // Connected :
+static void wsPrint(const String& str) {
+    if (!_instance || !_instance->isWsConnected()) return;
+    _instance->wsWrite(str);
+}
 
-// Callbacks
-class MyRemoteDebugCallbacks : public RemoteDebugWSCallbacks {
-    void onConnect() {
-        // WebSocket (app) connected
-        D("rd: onconnect")
-
-        _connectedWS = true;
-
-        // Is telnet connected -> disconnect it to reduce overhead
-        if (_instance->isConnected()) {
-            D("disconnect telnet, because WS is connected")
-            _instance->disconnect(true);
-        }
-
-        // Call same routine that telnet
-        _instance->onConnection(true);
-    }
-
-    void onDisconnect() {
-        //  (app) disconnected
-
-        D("rd: ondisconnect")
-        _connectedWS = false;
-    }
-
-    void onReceive(const char* message) {
-        // Receive a message
-        D("rd: onreceive")
-        _instance->wsOnReceive(message);
-    }
-};
+static void wsPrintln(const String& str) {
+    if (!_instance || !_instance->isWsConnected()) return;
+    String s = str;
+    s.concat('\n');
+    _instance->wsWrite(s);
+}
 
 #endif  // WEBSOCKET_DISABLED
 
@@ -197,8 +187,29 @@ bool RemoteDebug::begin(String hostName, uint16_t port, uint8_t startingDebugLev
 
     D("WEB_SOCKETS_DISABLED: %d", WEBSOCKET_DISABLED)
 #if not WEBSOCKET_DISABLED
-    // Initialize  (for RemoteDebugApp)
-    DebugWS.begin(new MyRemoteDebugCallbacks());
+    // Initialize WebSocket transport (for RemoteDebugApp)
+    _wsTransport.setConnectCallback([](bool connected) {
+        if (_instance) {
+            if (connected) {
+                D("rd: WS onconnect")
+                // Is telnet connected -> disconnect it to reduce overhead
+                if (_instance->isConnected()) {
+                    D("disconnect telnet, because WS is connected")
+                    _instance->disconnect(true);
+                }
+                _instance->onConnection(true);
+            } else {
+                D("rd: WS ondisconnect")
+            }
+        }
+    });
+    _wsTransport.setReceiveCallback([](const char* message) {
+        if (_instance) {
+            D("rd: WS onreceive")
+            _instance->wsOnReceive(message);
+        }
+    });
+    _wsTransport.begin(WEBSOCKET_PORT);
 #endif
 
     // Reserve space to buffer of print writes
@@ -276,9 +287,8 @@ void RemoteDebug::stop() {
     _telnetTransport.stop();
 
 #if not WEBSOCKET_DISABLED
-    // Stop  (RemoteDebugApp)
-
-    DebugWS.stop();  // stop the websocket server
+    // Stop WebSocket server (RemoteDebugApp)
+    _wsTransport.stop();
 #endif
 }
 
@@ -371,7 +381,7 @@ void RemoteDebug::handle() {
     // Client connected ?
 
 #if not WEBSOCKET_DISABLED
-    boolean connected = (_connected || _connectedWS);
+    boolean connected = (_connected || _wsTransport.isConnected());
 #else  // By telnet
     boolean connected = _connected;
 #endif
@@ -409,11 +419,7 @@ void RemoteDebug::handle() {
     }
 
 #if not WEBSOCKET_DISABLED  // For websocket server
-
-    //  server handle
-
-    DebugWS.handle();
-
+    _wsTransport.handle();
 #endif
 
 #ifdef DEBUGGER_ENABLED
@@ -469,10 +475,9 @@ void RemoteDebug::disconnect(boolean onlyTelnetClient) {
         _connected = false;
     }
 #if not WEBSOCKET_DISABLED
-    if (_connectedWS && !onlyTelnetClient) {
-        D("rd DebugWS.disconnect()")
-        DebugWS.disconnect();  // Disconnect client
-        _connectedWS = false;
+    if (_wsTransport.isConnected() && !onlyTelnetClient) {
+        D("rd _wsTransport.disconnect()")
+        _wsTransport.disconnect();
     }
 #endif
 }
@@ -530,7 +535,7 @@ boolean RemoteDebug::isConnected() {
     // Is connected
 
 #if not WEBSOCKET_DISABLED
-    return (_connected || _connectedWS);
+    return (_connected || _wsTransport.isConnected());
 #else
     return _connected;
 #endif
@@ -604,7 +609,7 @@ boolean RemoteDebug::isActive(uint8_t debugLevel) {
 #if not WEBSOCKET_DISABLED
     boolean ret = (debugLevel >= _state.getLevel() &&
                    !_state.isSilence() &&
-                   (_connected || _connectedWS || _state.serialEnabled()));
+                   (_connected || _wsTransport.isConnected() || _state.serialEnabled()));
 #else  // Telnet only
     boolean ret = (debugLevel >= _state.getLevel() &&
                    !_state.isSilence() &&
@@ -651,7 +656,7 @@ size_t RemoteDebug::write(uint8_t character) {
 
     // Connected ?
 #if not WEBSOCKET_DISABLED
-    boolean connected = (_connected || _connectedWS);
+    boolean connected = (_connected || _wsTransport.isConnected());
 #else
     boolean connected = _connected;
 #endif
@@ -929,7 +934,7 @@ void RemoteDebug::showHelp() {
     help.concat("\r\n");
 
 #if not WEBSOCKET_DISABLED
-    if (!_connectedWS) {  // For telnet only
+    if (!_wsTransport.isConnected()) {  // For telnet only
         help.concat("****\r\n");
         help.concat("* New features available:\r\n");
         help.concat("* - Now you can debug in web browser too.\r\n");
@@ -1043,13 +1048,13 @@ void RemoteDebug::processCommand() {
         uint32_t free = ESP.getFreeHeap();
 
         debugPrint("* Free Heap RAM: ");
-        debugPrintln(free);
+        debugPrintln(String(free));
 
 #if not WEBSOCKET_DISABLED
 
         // Send status to app
-        if (_connectedWS) {
-            DebugWS.printf("$app:M:%du:\n", free);
+        if (_wsTransport.isConnected()) {
+            wsPrintf("$app:M:%du:", free);
         }
 
 #endif
@@ -1215,7 +1220,7 @@ void RemoteDebug::processCommand() {
             _telnetTransport.stop();
 
 #if not WEBSOCKET_DISABLED
-            DebugWS.stop();
+            _wsTransport.stop();
 #endif
 
             delay(RESET_DELAY_MS);
@@ -1282,7 +1287,7 @@ void RemoteDebug::silence(boolean activate, boolean showMessage, boolean fromBre
         if (activate) {
             debugPrintln("* Debug now is in silent mode!");
 #if not WEBSOCKET_DISABLED
-            if (_connectedWS) {
+            if (_wsTransport.isConnected()) {
                 debugPrintln("* Press button \"Silence\" or another command to return show debugs");
             } else {
                 debugPrintln("* Press s again or another command to return show debugs");
@@ -1304,8 +1309,8 @@ void RemoteDebug::silence(boolean activate, boolean showMessage, boolean fromBre
 
     // Send status to app
 
-    if (_connectedWS) {
-        DebugWS.printf("$app:S:%c\n", ((_state.isSilence()) ? '1' : '0'));
+    if (_wsTransport.isConnected()) {
+        wsPrintf("$app:S:%c", ((_state.isSilence()) ? '1' : '0'));
     }
 
 #endif
@@ -1341,6 +1346,11 @@ String RemoteDebug::formatNumber(uint32_t value, uint8_t size, char insert) {
 
 ///////  routines
 
+// Write string to WebSocket transport
+void RemoteDebug::wsWrite(const String& str) {
+    _wsTransport.write((const uint8_t*)str.c_str(), str.length());
+}
+
 // Process user command over telnet or
 
 void RemoteDebug::wsOnReceive(const char* command) {  // @suppress("Unused function declaration")
@@ -1373,7 +1383,7 @@ void RemoteDebug::wsSendInfo() {
     char dbgEnabled;
 
     // Not connected ?
-    if (!_connectedWS) {
+    if (!_wsTransport.isConnected()) {
         D("wsSendInfo not connected")
         return;
     }
@@ -1402,8 +1412,8 @@ void RemoteDebug::wsSendInfo() {
     board = "ESP8266";
 #endif
 
-    DebugWS.println();  // Workaround to not get dirty "[0m" ???
-    DebugWS.printf("$app:V:%s:%s:%c:%du:%c:N\n", version.c_str(), board.c_str(), features, getFreeMemory(), dbgEnabled);
+    wsPrintln("");  // Workaround to not get dirty "[0m" ???
+    wsPrintf("$app:V:%s:%s:%c:%du:%c:N", version.c_str(), board.c_str(), features, getFreeMemory(), dbgEnabled);
 
     // Status of debug level
     wsSendLevelInfo();
@@ -1414,8 +1424,8 @@ void RemoteDebug::wsSendInfo() {
 
 void RemoteDebug::wsSendLevelInfo() {
     // Send debug level info to app
-    if (_connectedWS) {
-        DebugWS.printf("$app:L:%u\n", _state.getLevel());
+    if (_wsTransport.isConnected()) {
+        wsPrintf("$app:L:%u", _state.getLevel());
     }
 }
 
@@ -1425,7 +1435,7 @@ boolean RemoteDebug::wsIsConnected() {
     //  is connected (RemoteDebugApp)
 
 #if not WEBSOCKET_DISABLED
-    return _connectedWS;
+    return _wsTransport.isConnected();
 #else
     return false;
 #endif
