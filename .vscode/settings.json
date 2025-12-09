@@ -18,5 +18,9 @@
         "new": "cpp",
         "ostream": "cpp",
         "streambuf": "cpp"
+    },
+    "chat.tools.terminal.autoApprove": {
+        "^/home/karol/git-projects/RemoteDebug/.*": true,
+        ".*/home/karol/git-projects/RemoteDebug/.*": true
     }
 }

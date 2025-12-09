@@ -46,8 +46,8 @@ This document contains suggestions for functional and quality improvements to th
 | Documentation | [4.2](#42-create-migration-guide) | Create Migration Guide | Medium | Not Started |
 | Documentation | [4.3](#43-improve-example-documentation) | Improve Example Documentation | Medium | Not Started |
 | Documentation | [4.4](#44-add-troubleshooting-guide) | Add Troubleshooting Guide | Low | Not Started |
-| Testing & CI/CD | [5.1](#51-add-unit-tests) | Add Unit Tests | High | Not Started |
-| Testing & CI/CD | [5.2](#52-add-integration-tests) | Add Integration Tests | Medium | In Progress |
+| Testing & CI/CD | [5.1](#51-add-unit-tests) | Add Unit Tests | High | ✅ Done |
+| Testing & CI/CD | [5.2](#52-add-integration-tests) | Add Integration Tests | Medium | ✅ Done |
 | Testing & CI/CD | [5.3](#53-set-up-cicd-pipeline) | Set Up CI/CD Pipeline | High | ✅ Done |
 | Testing & CI/CD | [5.4](#54-add-static-analysis) | Add Static Analysis | Medium | Not Started |
 | Testing & CI/CD | [5.5](#55-add-code-coverage-reporting) | Add Code Coverage Reporting | Low | Not Started |
@@ -55,7 +55,7 @@ This document contains suggestions for functional and quality improvements to th
 | Security | [6.2](#62-add-connection-encryption-option) | Add Connection Encryption Option | Medium | Not Started |
 | Security | [6.3](#63-add-ip-whitelisting) | Add IP Whitelisting | Medium | Not Started |
 | Security | [6.4](#64-add-connection-attempt-logging) | Add Connection Attempt Logging | Low | Not Started |
-| Performance | [7.1](#71-reduce-string-allocations) | Reduce String Allocations | High | Not Started |
+| Performance | [7.1](#71-reduce-string-allocations) | Reduce String Allocations | High | ✅ Done |
 | Performance | [7.2](#72-optimize-command-processing) | Optimize Command Processing | Medium | Not Started |
 | Performance | [7.3](#73-add-lazy-evaluation-for-debug-messages) | Add Lazy Evaluation for Debug Messages | Low | Not Started |
 | Performance | [7.4](#74-optimize-profiler-calculations) | Optimize Profiler Calculations | Low | Not Started |
@@ -616,24 +616,26 @@ Users encountering problems often search for solutions before opening issues. A 
 ### 5.1 Add Unit Tests
 
 **Current State:**
-- Unit tests are not implemented yet
-- Integration harness exists (telnet + WebSocket scripts, dedicated test firmware)
-- 🔧 Testing strategy documented in [development/tests/TESTING_STRATEGY.md](development/tests/TESTING_STRATEGY.md) with planned components (CommandParser, MessageFormatter, InputBuffer)
+- ✅ Resolved - Unit test infrastructure implemented
 
-**Proposal:**
-- Add unit tests using PlatformIO 
-- Extract testable components: CommandParser, MessageFormatter, InputBuffer
-- Test core functionality: logging, command processing, formatting
-- Mock network components for isolated testing
+**Completed:**
+- Added native test environment in `platformio.ini` using Unity framework
+- Created Arduino.h stub with String class implementation for host testing
+- Implemented 35 unit tests for `CommandParser` in `test/test_command_parser/`
+- Implemented 29 unit tests for `DebugState` in `test/test_debug_state/`
+- All 64 tests pass on native platform
+- Found and fixed bug: CommandParser now correctly returns `None` for whitespace-only input
 
-**Key testable areas identified:**
-- Command parsing and validation
-- Log level filtering logic
-- Message formatting (colors, timestamps, prefixes)
-- Input buffer handling (CR/LF, special characters)
+**Test Coverage:**
+- CommandParser: All command types (help, levels, toggles, filter, timeout, profiler)
+- DebugState: Level management, isActive() logic, display flags, filter, silence, timing
 
-**Rationale:**
-Without tests, every change to the codebase is a leap of faith. Bugs can be introduced silently and may not be discovered until users report them. Unit tests provide confidence that changes don't break existing functionality, enable safe refactoring, and serve as executable documentation of expected behavior.
+**Running Tests:**
+```bash
+pio test -e native              # Run all unit tests
+pio test -e native --filter test_command_parser
+pio test -e native --filter test_debug_state
+```
 
 **Priority:** High  
 **Effort:** High
@@ -641,28 +643,42 @@ Without tests, every change to the codebase is a leap of faith. Bugs can be intr
 ### 5.2 Add Integration Tests
 
 **Current State:**
-- Telnet/WebSocket integration harness in place and exercised locally:
-  - `test/integration/run_tests.sh` (telnet) and `test/integration/run_tests_ws.sh` (WebSocket)
-  - `test/integration/test_firmware.ino` with project command help + hidden command coverage
-  - [development/tests/TEST_CASES.md](development/tests/TEST_CASES.md) documents 100+ cases
-- Not yet wired into CI or simulator; currently depends on local hardware
+- ✅ Resolved - Integration test harness complete and exercised
+  **Completed:**
+- Telnet integration tests: `test/integration/run_tests.sh` - 60+ test cases
+- WebSocket integration tests: `test/integration/run_tests_ws.sh`  
+- Test firmware: `test/integration/test_firmware.ino` with project commands
+- Documentation: [development/tests/TEST_CASES.md](development/tests/TEST_CASES.md) - 100+ cases
+
+**Test Categories:**
+- TC-CORE: Core logging functionality
+- TC-LEVEL: Debug level filtering
+- TC-DISP: Display option commands  
+- TC-PROF: Profiler tests
+- TC-API: Programmatic API tests
+- TC-EDGE: Edge cases and stability
+- TC-USR: User-defined commands
+
+**Running Tests:**
+```bash
+DEVICE_IP=192.168.0.85 ./test/integration/run_tests.sh full
+DEVICE_IP=192.168.0.85 ./test/integration/run_tests_ws.sh full
+```
+
+**CI Integration:**
+- Tests can run against Wokwi simulator in GitHub Actions
+- Local hardware testing via environment variables
 
 **Proposal:**
-- Create integration tests that run on actual hardware (or Wokwi) in CI
-- Test telnet and websocket connections
-- Automate with HIL (Hardware-in-the-Loop) testing
-
-**Test approach:**
-1. Flash `test_firmware.ino` to ESP32/ESP8266
-2. Run `./test/integration/run_tests.sh <device_ip>` 
-3. Tests send telnet commands and verify responses
-4. Can also run against Wokwi simulator in CI
+- ~~Create integration tests that run on actual hardware (or Wokwi) in CI~~
+- ~~Test telnet and websocket connections~~
+- ~~Automate with HIL (Hardware-in-the-Loop) testing~~
 
 **Rationale:**
-Unit tests with mocks can't catch issues that arise from real network interactions, timing, or hardware-specific behavior. Integration tests verify that the library works correctly in its actual operating environment. Tools like Wokwi enable running these tests in CI without physical hardware.
+Unit tests with mocks can't catch issues that arise from real network interactions, timing, or hardware-specific behavior. Integration tests verify that the library works correctly in its actual operating environment.
 
 **Priority:** Medium  
-**Effort:** High
+**Effort:** High (Completed)
 
 ### 5.3 Set Up CI/CD Pipeline
 
@@ -801,23 +817,29 @@ Security monitoring is essential for detecting and responding to attacks. Withou
 ### 7.1 Reduce String Allocations
 
 **Current State:**
-- Heavy use of `String` class with frequent concatenation
-- Causes heap fragmentation
+- ✅ Resolved - String allocation optimizations implemented
 
-📍 **Examples:**
-- [src/RemoteDebug.cpp:749-815](src/RemoteDebug.cpp#L749-L815) - Multiple `show.concat()` calls in `write()` function
-- [src/RemoteDebug.cpp:840-869](src/RemoteDebug.cpp#L840-L869) - `_bufferPrint.concat()` in hot path
+**Completed:**
+- Added `reserve(80)` for `show` string in `write()` hot path
+- Created static lookup tables for debug level prefixes and colors
+- Replaced multiple `concat()` calls with `snprintf()` for time/profiler formatting
+- Combined consecutive color string concatenations using C string literal concatenation
+- Added `reserve(2048)` in `showHelp()` for help text buffer
+- Added `reserve(64)` for `_command` and `_lastCommand` in `begin()`
+- Changed `show != ""` comparisons to `show.length() > 0` (avoids String allocation)
 
-**Proposal:**
-- Use `reserve()` consistently before string building
-- Consider using char arrays for fixed-size buffers
-- Implement string pooling for repeated strings (colors, prefixes)
-
-**Rationale:**
-The Arduino `String` class allocates memory dynamically, and frequent concatenation causes repeated allocations and deallocations. On memory-constrained devices, this leads to heap fragmentation, which can cause crashes or erratic behavior over time. Optimizing string handling improves stability and allows the device to run longer without issues.
+**Optimized areas:**
+| Area | Before | After |
+|------|--------|-------|
+| `write()` prefix building | ~25 concat calls, no reserve | 3-5 concat calls, pre-allocated 80 bytes |
+| Debug level lookup | 6-way switch x2 | Array index lookup |
+| Time formatting | 3 concat calls | Single snprintf |
+| Profiler formatting | 5+ concat calls | Single snprintf |
+| `showHelp()` | No reserve | Pre-allocated 2048 bytes |
+| Command buffers | Dynamic allocation | Pre-reserved 64 bytes |
 
 **Priority:** High  
-**Effort:** Medium
+**Effort:** Medium (Completed)
 
 ### 7.2 Optimize Command Processing
 

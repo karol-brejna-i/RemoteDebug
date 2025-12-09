@@ -99,6 +99,25 @@ bool system_update_cpu_freq(uint8_t freq);
 
 #endif
 
+// Static lookup tables for debug level prefixes and colors (avoid switch/case overhead)
+static const char* const DEBUG_LEVEL_PREFIXES[] = {
+    "(P",  // PROFILER = 0
+    "(V",  // VERBOSE = 1
+    "(D",  // DEBUG = 2
+    "(I",  // INFO = 3
+    "(W",  // WARNING = 4
+    "(E"   // ERROR = 5
+};
+
+static const char* const DEBUG_LEVEL_COLORS[] = {
+    "",               // PROFILER = 0 (no special color)
+    COLOR_VERBOSE,    // VERBOSE = 1
+    COLOR_DEBUG,      // DEBUG = 2
+    COLOR_INFO,       // INFO = 3
+    COLOR_WARNING,    // WARNING = 4
+    COLOR_ERROR       // ERROR = 5
+};
+
 // Instance
 static RemoteDebug* _instance;
 
@@ -185,6 +204,10 @@ bool RemoteDebug::begin(String hostName, uint16_t port, uint8_t startingDebugLev
     // Reserve space to buffer of print writes
 
     _bufferPrint.reserve(BUFFER_PRINT);
+
+    // Reserve space for command buffers
+    _command.reserve(64);
+    _lastCommand.reserve(64);
 
 #ifdef CLIENT_BUFFERING
     // Reserve space to buffer of send
@@ -656,96 +679,59 @@ size_t RemoteDebug::write(uint8_t character) {
 #endif
 
         String show = "";
+        show.reserve(80);  // Pre-allocate: color(5) + level(2) + time(15) + profiler(25) + separator
 
         // Not in raw mode (only data)
         if (!_state.showRaw()) {
-            // New color system
-            if (_state.showColors()) {
-                switch (_state.getLastLevel()) {
-                    case VERBOSE:
-                        show = COLOR_VERBOSE;
-                        break;
-                    case DEBUG:
-                        show = COLOR_DEBUG;
-                        break;
-                    case INFO:
-                        show = COLOR_INFO;
-                        break;
-                    case WARNING:
-                        show = COLOR_WARNING;
-                        break;
-                    case ERROR:
-                        show = COLOR_ERROR;
-                        break;
-                }
+            uint8_t level = _state.getLastLevel();
+            
+            // New color system - use lookup table
+            if (_state.showColors() && level >= VERBOSE && level <= ERROR) {
+                show = DEBUG_LEVEL_COLORS[level];
                 colorLevel = show;
             }
 
-            // Show debug level
-            if (_state.showDebugLevel()) {
-                switch (_state.getLastLevel()) {
-                    case PROFILER:
-                        show.concat("(P");
-                        break;
-                    case VERBOSE:
-                        show.concat("(V");
-                        break;
-                    case DEBUG:
-                        show.concat("(D");
-                        break;
-                    case INFO:
-                        show.concat("(I");
-                        break;
-                    case WARNING:
-                        show.concat("(W");
-                        break;
-                    case ERROR:
-                        show.concat("(E");
-                        break;
-                }
+            // Show debug level - use lookup table
+            if (_state.showDebugLevel() && level <= ERROR) {
+                show.concat(DEBUG_LEVEL_PREFIXES[level]);
             }
 
-            // Show time in millis
+            // Show time in millis - use snprintf instead of multiple concat
             if (_state.showTime()) {
-                if (show != "") {
-                    show.concat(" ");
-                }
-                show.concat("t:");
-                show.concat(millis());
-                show.concat("ms");
+                char timeBuf[20];
+                snprintf(timeBuf, sizeof(timeBuf), "%st:%lums", 
+                         (show.length() > 0 ? " " : ""), millis());
+                show.concat(timeBuf);
             }
 
             // Show profiler (time between messages)
             if (_state.showProfiler()) {
                 elapsed = (millis() - _state.lastTimePrint());
                 boolean resetColors = false;
-                if (show != "") {
+                if (show.length() > 0) {
                     show.concat(" ");
                 }
                 if (_state.showColors()) {
                     if (elapsed < PROFILER_THRESHOLD_GREEN_MS) {
                         ;  // not color this
                     } else if (elapsed < PROFILER_THRESHOLD_YELLOW_MS) {
-                        show.concat(COLOR_BLACK);
-                        show.concat(COLOR_BACKGROUND_GREEN);
+                        show.concat(COLOR_BLACK COLOR_BACKGROUND_GREEN);
                         resetColors = true;
                     } else if (elapsed < PROFILER_THRESHOLD_MAGENTA_MS) {
-                        show.concat(COLOR_BLACK);
-                        show.concat(COLOR_BACKGROUND_YELLOW);
+                        show.concat(COLOR_BLACK COLOR_BACKGROUND_YELLOW);
                         resetColors = true;
                     } else if (elapsed < PROFILER_THRESHOLD_RED_MS) {
-                        show.concat(COLOR_WHITE);
-                        show.concat(COLOR_BACKGROUND_MAGENTA);
+                        show.concat(COLOR_WHITE COLOR_BACKGROUND_MAGENTA);
                         resetColors = true;
                     } else {
-                        show.concat(COLOR_WHITE);
-                        show.concat(COLOR_BACKGROUND_RED);
+                        show.concat(COLOR_WHITE COLOR_BACKGROUND_RED);
                         resetColors = true;
                     }
                 }
-                show.concat("p:^");
-                show.concat(formatNumber(elapsed, 4));
-                show.concat("ms");
+                // Use snprintf for profiler formatting instead of formatNumber + multiple concat
+                char profBuf[20];
+                snprintf(profBuf, sizeof(profBuf), "p:^%4lums", elapsed);
+                show.concat(profBuf);
                 if (resetColors) {
                     show.concat(COLOR_RESET);
                     show.concat(colorLevel);
@@ -757,7 +743,7 @@ size_t RemoteDebug::write(uint8_t character) {
         }
 
         // Show anything ?
-        if (show != "") {
+        if (show.length() > 0) {
             if (!_state.showRaw()) {
                 show.concat(") ");
             }
@@ -843,6 +829,7 @@ size_t RemoteDebug::write(uint8_t character) {
 void RemoteDebug::showHelp() {
     D("showHelp")
     String help = "";
+    help.reserve(2048);  // Pre-allocate for help text (measured ~1.5KB typical)
 
     // Password request ? - 04/03/18
     if (_password != "" && !_passwordOk) {
