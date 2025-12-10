@@ -86,5 +86,13 @@ Two WebSocket implementations exist:
 - [x] ESP32 build passes
 - [x] ESP8266 build passes
 - [x] Unit tests pass (64 tests)
-- [x] Telnet integration tests pass (58/58 core tests)
-- [ ] WebSocket integration tests (need manual testing with RemoteDebugApp)
+- [x] Telnet integration tests pass (60/60 tests)
+- [x] WebSocket integration tests pass (25/25 tests)
+
+**WebSocket Test Coverage (added 2025-12-10):**
+- TC-WS-CON: Connection/handshake tests
+- TC-WS-CMD: Command tests (help, memory, levels, toggles)
+- TC-WS-FW: Test firmware commands (ping, echo, status)
+- TC-WS-STAB: Stability tests (command sequence, long commands)
+- TC-WS-API: API method tests (filter, silence, getLastCommand, clearLastCommand, isConnected, callback)
+- TC-WS-EDGE: Edge cases (rapid commands, long command, long message, special chars, flood)

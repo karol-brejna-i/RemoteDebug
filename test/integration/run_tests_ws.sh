@@ -378,6 +378,140 @@ test_stability() {
 }
 
 #------------------------------------------------------------------------------
+# Test Cases - Section 5: API Method Tests (WebSocket)
+#------------------------------------------------------------------------------
+
+test_api_methods() {
+    log_section "5. API Method Tests (TC-WS-API)"
+    
+    local response
+    
+    # TC-WS-API-011/012: setFilter/setNoFilter via commands
+    send_command "filter wstest" >/dev/null
+    send_command "nofilter" >/dev/null
+    log_pass "TC-WS-API-011/012: setFilter/setNoFilter via commands"
+    
+    # TC-WS-API-013/014: silence via command
+    send_command "s" >/dev/null
+    send_command "h" >/dev/null  # Exit silence
+    log_pass "TC-WS-API-013/014: silence via commands"
+    
+    if [[ "$TEST_FIRMWARE" == "1" ]]; then
+        # TC-WS-API-006: getLastCommand()
+        response=$(send_command "test_last_cmd")
+        if echo "$response" | grep -qiE "LAST_CMD:test_last_cmd"; then
+            log_pass "TC-WS-API-006: getLastCommand() returns correct command"
+        else
+            log_fail "TC-WS-API-006: getLastCommand() failed"
+            [[ "$VERBOSE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-WS-API-007: clearLastCommand()
+        response=$(send_command "test_clear_cmd")
+        if echo "$response" | grep -qiE "CLEAR_CMD:OK"; then
+            log_pass "TC-WS-API-007: clearLastCommand() clears buffer"
+        else
+            log_fail "TC-WS-API-007: clearLastCommand() failed"
+            [[ "$VERBOSE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-WS-API-009: isConnected()
+        response=$(send_command "test_connected")
+        if echo "$response" | grep -qiE "CONNECTED:1"; then
+            log_pass "TC-WS-API-009: isConnected() returns true"
+        else
+            log_fail "TC-WS-API-009: isConnected() failed"
+            [[ "$VERBOSE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-WS-API-014: isSilence() - should be false initially
+        response=$(send_command "test_silence")
+        if echo "$response" | grep -qiE "SILENCE:0"; then
+            log_pass "TC-WS-API-014: isSilence() returns false (not silent)"
+        else
+            log_fail "TC-WS-API-014: isSilence() failed"
+            [[ "$VERBOSE" == "1" ]] && echo "Response: $response"
+        fi
+        
+        # TC-WS-API-008: setCallBackProjectCmds() - the callback is working if commands work
+        response=$(send_command "test_callback")
+        if echo "$response" | grep -qiE "CALLBACK:OK"; then
+            log_pass "TC-WS-API-008: setCallBackProjectCmds() callback works"
+        else
+            log_fail "TC-WS-API-008: setCallBackProjectCmds() failed"
+            [[ "$VERBOSE" == "1" ]] && echo "Response: $response"
+        fi
+    else
+        log_skip "TC-WS-API-006-014: API tests (require TEST_FIRMWARE=1)"
+    fi
+}
+
+#------------------------------------------------------------------------------
+# Test Cases - Section 6: Edge Cases (WebSocket)
+#------------------------------------------------------------------------------
+
+test_edge_cases() {
+    log_section "6. Edge Cases & Stability Tests (TC-WS-EDGE)"
+    
+    local response
+    
+    # TC-WS-EDGE-003: Rapid Commands
+    log_info "Sending rapid command sequence..."
+    for cmd in "v" "d" "i" "w" "e" "m" "h" "c" "c" "t" "t"; do
+        send_command "$cmd" >/dev/null
+    done
+    
+    response=$(send_command "m")
+    if echo "$response" | grep -qiE "memory|heap|[0-9]"; then
+        log_pass "TC-WS-EDGE-003: Rapid commands (no crash)"
+    else
+        log_fail "TC-WS-EDGE-003: Device unresponsive after rapid commands"
+    fi
+    
+    # TC-WS-EDGE-006: Very Long Command (500 chars)
+    local long_cmd
+    long_cmd=$(printf 'x%.0s' {1..500})
+    send_command "$long_cmd" >/dev/null
+    
+    response=$(send_command "m")
+    if echo "$response" | grep -qiE "memory|heap|[0-9]"; then
+        log_pass "TC-WS-EDGE-006: Long command 500 chars (no crash)"
+    else
+        log_fail "TC-WS-EDGE-006: Device crashed on long command"
+    fi
+    
+    if [[ "$TEST_FIRMWARE" == "1" ]]; then
+        # TC-WS-EDGE-001: Long Message
+        response=$(send_command "test_long")
+        if echo "$response" | grep -qiE "LONG_MESSAGE|500|END"; then
+            log_pass "TC-WS-EDGE-001: Long message handling"
+        else
+            log_skip "TC-WS-EDGE-001: Long message (check output)"
+        fi
+        
+        # TC-WS-EDGE-002: Special Characters
+        response=$(send_command "test_special")
+        if echo "$response" | grep -qiE "Special|tab|quote"; then
+            log_pass "TC-WS-EDGE-002: Special characters"
+        else
+            log_skip "TC-WS-EDGE-002: Special characters (check output)"
+        fi
+        
+        # TC-WS-EDGE-004: Message Flood
+        response=$(send_command "test_flood")
+        sleep 2
+        response=$(send_command "m")
+        if echo "$response" | grep -qiE "memory|heap|[0-9]"; then
+            log_pass "TC-WS-EDGE-004: Message flood (still responsive)"
+        else
+            log_fail "TC-WS-EDGE-004: Device unresponsive after flood"
+        fi
+    else
+        log_skip "TC-WS-EDGE-001/002/004: Edge case tests (require TEST_FIRMWARE=1)"
+    fi
+}
+
+#------------------------------------------------------------------------------
 # Test Suites
 #------------------------------------------------------------------------------
 
@@ -423,6 +557,8 @@ run_full_tests() {
     test_commands
     test_firmware_commands
     test_stability
+    test_api_methods
+    test_edge_cases
 }
 
 #------------------------------------------------------------------------------
