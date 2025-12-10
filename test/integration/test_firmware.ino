@@ -315,7 +315,9 @@ void processTestCommands() {
     // Hidden command - intentionally NOT listed in help (for testing)
     else if (command == "hidden_cmd") {
         Serial.println("[CMD] hidden_cmd (not in help)");
+        // Double-write to ensure the test harness sees it even if debug level/output buffering changes
         debugI("HIDDEN_CMD_EXECUTED");
+        Debug.println("HIDDEN_CMD_EXECUTED");
         Debug.clearLastCommand();
     }
     // API Test Commands - for verifying RemoteDebug API methods

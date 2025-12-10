@@ -9,6 +9,18 @@ CommandParser::Result CommandParser::parse(const String& raw) const {
     String trimmed = raw;
     trimmed.trim();
 
+    // Strip non-printable noise that can be introduced by some telnet clients
+    // (e.g. stray negotiation bytes).
+    String cleaned;
+    cleaned.reserve(trimmed.length());
+    for (unsigned int i = 0; i < trimmed.length(); ++i) {
+        char c = trimmed[i];
+        if (c >= 32 && c <= 126) {
+            cleaned += c;
+        }
+    }
+    trimmed = cleaned;
+
     // After trimming, if empty, return None
     if (trimmed.length() == 0) {
         return res;
