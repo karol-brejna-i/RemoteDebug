@@ -9,14 +9,14 @@
 // Board especific libraries
 #if defined ESP8266 || defined ESP32
 // Use mDNS ? (comment this do disable it)
-#define USE_MDNS true
-#define USE_ARDUINO_OTA false
+#define USE_MDNS 
+#define USE_ARDUINO_OTA 
 #else
 #error "The board must be ESP8266 or ESP32"
 #endif  // ESP
 
 // Web server (uncomment this to need this)
-#define WEB_SERVER_ENABLED false
+#define WEB_SERVER_ENABLED 
 
 ////// Includes
 #if defined ESP8266
